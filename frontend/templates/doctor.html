@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PharmSandbox 医生工作台</title>
+<style>
+:root {
+  --bg-oat:#F5F0EB; --bg-card:rgba(255,255,255,0.55);
+  --sage:#B5C4B1; --sage-deep:#8FA88A; --sage-bg:rgba(181,196,177,0.18);
+  --sunset:#E8B98D; --sunset-deep:#D4955C; --sunset-bg:rgba(232,185,141,0.16);
+  --dusty-rose:#C4A8A2; --dusty-deep:#A67F78; --rose-bg:rgba(196,168,162,0.16);
+  --dusty-blue:#9CAEBF; --dusty-blue-deep:#738A9F; --blue-bg:rgba(156,174,191,0.12);
+  --text-primary:#4A4543; --text-secondary:#8A827E; --text-muted:#B5AFAA;
+  --radius:16px; --radius-sm:10px; --glass-blur:14px;
+  --glass-border:1px solid rgba(255,255,255,0.45);
+  --shadow-sm:0 1px 3px rgba(74,69,67,0.06);
+  --shadow-md:0 4px 16px rgba(74,69,67,0.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg-oat);color:var(--text-primary);min-height:100vh}
+.glass{background:var(--bg-card);backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));border:var(--glass-border);box-shadow:var(--shadow-sm)}
+
+/* Top Bar */
+.top-bar{display:flex;justify-content:space-between;align-items:center;padding:16px 28px;position:sticky;top:0;z-index:10;background:rgba(245,240,235,0.85);backdrop-filter:blur(var(--glass-blur));border-bottom:1px solid rgba(180,170,160,0.2)}
+.top-bar h1{font-size:22px;color:var(--dusty-blue-deep);font-weight:700}
+.top-bar .sub{font-size:13px;color:var(--text-secondary);margin-left:12px}
+.top-stats{display:flex;gap:20px}
+.top-stats .stat{text-align:center}
+.top-stats .stat .n{font-size:20px;font-weight:700}
+.top-stats .stat .l{font-size:10px;color:var(--text-muted);text-transform:uppercase}
+
+/* Main Layout */
+.main{padding:20px 28px;display:flex;gap:20px}
+.queue-panel{flex:1.8}
+.detail-panel{flex:1;position:sticky;top:80px;align-self:flex-start}
+
+/* Patient Queue */
+.patient-row{display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:var(--radius-sm);margin-bottom:10px;cursor:pointer;transition:all 0.25s ease}
+.patient-row:hover{box-shadow:var(--shadow-md);transform:translateX(3px)}
+.patient-row.selected{border-left:4px solid var(--dusty-blue-deep);background:var(--blue-bg)}
+.patient-avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;flex-shrink:0}
+.patient-info{flex:1;min-width:0}
+.patient-info .name{font-weight:600;font-size:15px}
+.patient-info .detail{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.patient-drugs{display:flex;gap:4px;flex-wrap:wrap;max-width:220px}
+.patient-drugs .med-tag{padding:2px 8px;border-radius:10px;font-size:10px;background:var(--blue-bg);color:var(--dusty-blue-deep);white-space:nowrap}
+.status-badge{padding:5px 12px;border-radius:14px;font-size:11px;font-weight:600;white-space:nowrap}
+.status-badge.high_risk{background:#f5e6e5;color:#8B3A3A;border:1px solid rgba(166,80,90,0.4)}
+.status-badge.refill{background:var(--sunset-bg);color:var(--sunset-deep);border:1px solid rgba(212,149,92,0.35)}
+.status-badge.normal{background:var(--sage-bg);color:var(--sage-deep);border:1px solid rgba(143,168,138,0.3)}
+.status-badge.processed{background:#e8e8e8;color:#999;border:1px solid rgba(150,150,150,0.2)}
+
+/* Detail Panel */
+.detail-card{padding:20px;border-radius:var(--radius)}
+.detail-card h3{font-size:14px;color:var(--text-secondary);margin-bottom:14px}
+.lab-row{display:flex;gap:10px;margin:8px 0}
+.lab-item{flex:1;text-align:center;padding:8px;border-radius:var(--radius-sm);background:rgba(0,0,0,0.02)}
+.lab-item .val{font-size:18px;font-weight:700}
+.lab-item .lab{font-size:10px;color:var(--text-muted)}
+.lab-item .val.spike{color:var(--dusty-deep);animation:pulse 0.8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+.action-btn{width:100%;padding:12px;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;margin-top:10px;transition:all 0.2s}
+.action-btn.primary{background:var(--dusty-blue-deep);color:#fff}
+.action-btn.primary:hover{background:#688097;transform:translateY(-1px)}
+.action-btn.secondary{background:transparent;color:var(--text-secondary);border:1px solid var(--text-muted)}
+.action-btn.secondary:hover{background:rgba(0,0,0,0.03)}
+
+/* Toast */
+.toast{position:fixed;top:20px;right:20px;z-index:200;padding:14px 20px;border-radius:var(--radius-sm);background:#fff;box-shadow:var(--shadow-md);transform:translateX(120%);transition:0.3s;font-size:13px}
+.toast.show{transform:translateX(0)}
+.toast.success{border-left:3px solid var(--sage-deep)}
+.toast.info{border-left:3px solid var(--dusty-blue-deep)}
+
+/* C-end badge */
+.patient-link{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:12px;font-size:10px;background:var(--sage-bg);color:var(--sage-deep);cursor:pointer;margin-top:4px}
+.patient-link:hover{opacity:0.8}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div><h1 style="display:inline">PharmSandbox 医生工作台</h1><span class="sub">基于GNN的个体化用药临床决策支持</span></div>
+  <div class="top-stats">
+    <div class="stat"><div class="n" id="statTotal">10</div><div class="l">待诊患者</div></div>
+    <div class="stat"><div class="n" id="statHigh" style="color:var(--dusty-deep)">5</div><div class="l">高危拦截</div></div>
+    <div class="stat"><div class="n" id="statRefill" style="color:var(--sunset-deep)">3</div><div class="l">续方申请</div></div>
+    <div class="stat"><div class="n" id="statDone" style="color:var(--sage-deep)">0</div><div class="l">已处理</div></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="main">
+  <!-- Patient Queue -->
+  <div class="queue-panel" id="queuePanel"></div>
+
+  <!-- Detail Sidebar -->
+  <div class="detail-panel">
+    <div class="glass detail-card" id="detailCard">
+      <h3>📋 患者详情</h3>
+      <div id="detailContent" style="font-size:13px;color:var(--text-muted)">← 点击左侧患者查看详情</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== STATE ====================
+let patients = [];
+let selectedPatient = null;
+const processedSet = new Set(JSON.parse(localStorage.getItem('pharmsandbox_processed')||'[]'));
+
+// ==================== INIT ====================
+document.addEventListener('DOMContentLoaded', () => {
+  fetchPatients();
+  // Listen for cross-window C-end alerts
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'pharmsandbox_patient_alert') {
+      const {patientId, alertType, message} = JSON.parse(e.newValue||'{}');
+      showToast(`🏥 患者端上报: ${message}`, 'info');
+      highlightPatient(patientId, 'high_risk', message);
+    }
+    if (e.key === 'pharmsandbox_processed') {
+      processedSet.clear();
+      JSON.parse(e.newValue||'[]').forEach(id => processedSet.add(id));
+      renderQueue();
+    }
+  });
+});
+
+async function fetchPatients() {
+  try {
+    const r = await fetch('/api/ehr/patients');
+    const d = await r.json();
+    patients = d.patients.map(p => ({
+      ...p, _status: processedSet.has(p.id) ? 'processed' : p.status
+    }));
+    renderQueue();
+  } catch(e) {
+    showToast('无法加载患者列表', 'info');
+  }
+}
+
+// ==================== RENDER ====================
+function renderQueue() {
+  const panel = document.getElementById('queuePanel');
+  const counts = {high_risk:0, refill:0, normal:0, processed:processedSet.size};
+
+  patients.forEach(p => {
+    const s = processedSet.has(p.id) ? 'processed' : p.status;
+    if (s !== 'processed') counts[s] = (counts[s]||0) + 1;
+  });
+
+  document.getElementById('statHigh').textContent = counts.high_risk;
+  document.getElementById('statRefill').textContent = counts.refill;
+  document.getElementById('statDone').textContent = counts.processed;
+
+  // Sort: high_risk → refill → normal → processed
+  const order = {high_risk:0, refill:1, normal:2, processed:3};
+  const sorted = [...patients].sort((a,b) => {
+    const sa = processedSet.has(a.id) ? 'processed' : a.status;
+    const sb = processedSet.has(b.id) ? 'processed' : b.status;
+    return (order[sa]||0) - (order[sb]||0);
+  });
+
+  const colors = {M:'#738A9F',F:'#C4A8A2'};
+  panel.innerHTML = sorted.map(p => {
+    const selClass = selectedPatient?.id === p.id ? 'selected' : '';
+    const s = processedSet.has(p.id) ? 'processed' : p.status;
+    const msg = processedSet.has(p.id) ? '🟢 已处理' : p.status_msg;
+    return `
+    <div class="patient-row glass ${selClass}" onclick="selectPatient('${p.id}')" id="row-${p.id}">
+      <div class="patient-avatar" style="background:${colors[p.gender]||'#9CAEBF'}">${p.name[0]}</div>
+      <div class="patient-info">
+        <div class="name">${p.name} <span style="font-weight:400;font-size:12px;color:var(--text-muted)">${p.age}岁 ${p.gender==='M'?'男':'女'} · ${p.bed}</span></div>
+        <div class="detail">${p.summary}</div>
+        <div class="patient-drugs">${p.drugs.map(d=>`<span class="med-tag">${d}</span>`).join('')}</div>
+      </div>
+      <span class="status-badge ${s}">${msg}</span>
+    </div>`;
+  }).join('');
+}
+
+// ==================== SELECT PATIENT ====================
+function selectPatient(id) {
+  selectedPatient = patients.find(p => p.id === id);
+  if (!selectedPatient) return;
+  renderQueue();
+  renderDetail();
+}
+
+function renderDetail() {
+  if (!selectedPatient) return;
+  const p = selectedPatient;
+  const isProcessed = processedSet.has(p.id);
+  const labs = p.labs || {};
+
+  document.getElementById('detailContent').innerHTML = `
+    <div style="margin-bottom:12px">
+      <b style="font-size:16px">${p.name}</b>
+      <span style="color:var(--text-muted);margin-left:8px">${p.age}岁 · ${p.gender==='M'?'男':'女'} · 住院号${p.id}</span>
+    </div>
+    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">
+      入院: ${p.admitted} | 诊断: ${p.conditions.join('、')}
+    </div>
+    <h4 style="font-size:12px;color:var(--text-secondary);margin:8px 0">化验指标 <span style="font-weight:400;font-size:10px;color:var(--text-muted)">· MIMIC-IV</span></h4>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      ${Object.entries(labs).map(([k,v]) => {
+        const label = {creatinine:'肌酐',alt:'ALT',bun:'BUN',inr:'INR'}[k]||k;
+        const unit = {creatinine:'μmol/L',alt:'U/L',bun:'mmol/L',inr:''}[k]||'';
+        const high = (k==='creatinine'&&v>130)||(k==='alt'&&v>60)||(k==='bun'&&v>12)||(k==='inr'&&v>2.5);
+        return `<div style="text-align:center;padding:10px 6px;border-radius:10px;background:${high?'#fdf2f2':'rgba(0,0,0,0.02)'};border:1px solid ${high?'rgba(166,80,90,0.25)':'rgba(0,0,0,0.04)'};transition:all 0.3s">
+          <div class="val" id="lab-${k}" style="font-size:20px;font-weight:700;color:${high?'var(--dusty-deep)':'var(--text-primary)'}">${v}</div>
+          <div style="font-size:10px;color:${high?'var(--dusty-deep)':'var(--text-muted)'}">${label} <span style="font-size:9px">${unit}</span></div>
+        </div>`;
+      }).join('')}
+    </div>
+    <button class="action-btn secondary" onclick="refreshLabs()" style="margin:10px 0 4px;font-size:12px;width:100%">
+      🔄 模拟物联网刷新化验
+    </button>
+    <h4 style="font-size:12px;color:var(--text-secondary);margin:8px 0">当前处方</h4>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">
+      ${p.drugs.map(d=>`<span class="med-tag" style="font-size:12px;padding:4px 10px">${d}</span>`).join('')}
+    </div>
+
+    ${isProcessed ? `
+      <div style="text-align:center;padding:16px;color:var(--sage-deep)">🟢 该患者已处理完毕</div>
+    ` : `
+      <button class="action-btn primary" onclick="openSandbox()">
+        ⚡ 进入沙盘推演
+      </button>
+      <button class="action-btn secondary" onclick="quickProcess()">
+        ✓ 快速标记已处理
+      </button>
+      <a class="patient-link" onclick="openPatientView()" style="margin-top:8px;display:block;text-align:center;cursor:pointer">
+        📱 查看患者端视图
+      </a>
+    `}
+  `;
+}
+
+// ==================== ACTIONS ====================
+function openSandbox() {
+  if (!selectedPatient) return;
+  // Store patient data in localStorage for sandbox page to auto-fill
+  localStorage.setItem('pharmsandbox_active_patient', JSON.stringify(selectedPatient));
+  window.open('/sandbox', '_blank');
+}
+
+function openPatientView() {
+  if (!selectedPatient) return;
+  localStorage.setItem('pharmsandbox_active_patient', JSON.stringify(selectedPatient));
+  window.open('/patient', '_blank');
+}
+
+function quickProcess() {
+  if (!selectedPatient) return;
+  processedSet.add(selectedPatient.id);
+  localStorage.setItem('pharmsandbox_processed', JSON.stringify([...processedSet]));
+  renderQueue();
+  renderDetail();
+  showToast(`${selectedPatient.name} 已标记为已处理`, 'success');
+}
+
+async function refreshLabs() {
+  if (!selectedPatient) return;
+  try {
+    const r = await fetch('/api/ehr/lab_refresh', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({labs: selectedPatient.labs})
+    });
+    const d = await r.json();
+    // Update display
+    const refreshed = d.refreshed;
+    Object.entries(refreshed).forEach(([k,v]) => {
+      const el = document.getElementById('lab-'+k);
+      if (el) {
+        const parent = el.parentElement;
+        el.textContent = v;
+        if (d.spike && d.spike_key === k) {
+          el.style.color = 'var(--dusty-deep)';
+          el.classList.add('spike');
+          parent.style.background = '#fdf2f2';
+          parent.style.borderColor = 'rgba(166,80,90,0.25)';
+        }
+      }
+    });
+    // Update patient data
+    selectedPatient.labs = refreshed;
+    localStorage.setItem('pharmsandbox_active_patient', JSON.stringify(selectedPatient));
+    showToast(d.message, d.spike ? 'info' : 'success');
+  } catch(e) {
+    showToast('化验刷新失败', 'info');
+  }
+}
+
+function highlightPatient(id, status, msg) {
+  const p = patients.find(p => p.id === id);
+  if (p) {
+    p.status = status;
+    p.status_msg = msg;
+    processedSet.delete(id);
+    localStorage.setItem('pharmsandbox_processed', JSON.stringify([...processedSet]));
+    renderQueue();
+  }
+}
+
+// ==================== UTILS ====================
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show ' + (type||'info');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+.venv
+/DDICorpus
+/pubmed_portions
+/Dataset
+/Full_Pipeline/model/
+/Pipeline3/drugbank_indications.csv
+/Pipeline3/model

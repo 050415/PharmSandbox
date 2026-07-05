@@ -1,0 +1,107 @@
+.calendar-container {
+    user-select: none;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.calendar-day-header {
+    text-align: center;
+    font-weight: bold;
+    padding: 10px 0;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.calendar-day {
+    height: 80px;
+    border: 1px solid #e9ecef;
+    padding: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 4px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.empty-day {
+    background-color: #f8f9fa;
+    cursor: default;
+}
+
+.date-number {
+    font-weight: bold;
+}
+
+.calendar-day:hover:not(.empty-day) {
+    background-color: #f1f3f5;
+    transform: scale(1.02);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    z-index: 1;
+}
+
+.calendar-day-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.calendar-day-has-medication {
+    background-color: #e7f5ff;
+    border-color: #4dabf7;
+}
+
+.calendar-day-today {
+    background-color: #fff9db;
+    border: 2px solid #fcc419;
+    font-weight: bold;
+}
+
+.calendar-day-selected {
+    background-color: #e7f5ff;
+    border: 2px solid #4dabf7;
+}
+
+.medication-indicator {
+    margin-top: auto;
+    text-align: center;
+}
+
+.medication-item {
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+
+.medication-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.legend-item {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.8rem;
+}
+
+.legend-color {
+    width: 15px;
+    height: 15px;
+    border-radius: 4px;
+    margin-right: 5px;
+    display: inline-block;
+}
+
+.calendar-day-has-medication-indicator {
+    background-color: #e7f5ff;
+    border: 1px solid #4dabf7;
+}
+
+.calendar-day-today-indicator {
+    background-color: #fff9db;
+    border: 1px solid #fcc419;
+}

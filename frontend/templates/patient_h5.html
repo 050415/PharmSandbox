@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>PharmSandbox 患者端</title>
+<style>
+:root {
+  --sage:#B5C4B1; --sage-deep:#8FA88A; --sunset:#E8B98D; --sunset-deep:#D4955C;
+  --dusty-rose:#C4A8A2; --dusty-deep:#A67F78; --dusty-blue:#9CAEBF; --dusty-blue-deep:#738A9F;
+  --text-primary:#4A4543; --text-secondary:#8A827E; --text-muted:#B5AFAA;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#2C2C2E;display:flex;justify-content:center;align-items:center;min-height:100vh}
+
+.phone-frame{width:390px;height:844px;background:#F5F0EB;border-radius:44px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);display:flex;flex-direction:column;position:relative}
+.phone-notch{height:36px;background:#F5F0EB;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;font-size:11px;color:var(--text-primary);font-weight:600}
+
+.chat-header{display:flex;align-items:center;padding:8px 14px;border-bottom:1px solid rgba(0,0,0,0.05);gap:10px;background:rgba(255,255,255,0.45)}
+.chat-header .avatar{width:34px;height:34px;border-radius:50%;background:var(--dusty-blue-deep);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0}
+.chat-header .title{font-weight:600;font-size:13px}
+.chat-header .sub{font-size:10px;color:var(--text-secondary)}
+
+.progress-area{padding:14px 16px 8px;display:flex;align-items:center;gap:14px;border-bottom:1px solid rgba(0,0,0,0.04);background:linear-gradient(180deg,rgba(255,255,255,0.5),rgba(255,255,255,0.1))}
+.progress-info{flex:1}
+.progress-info .prog-title{font-size:13px;font-weight:600;margin-bottom:4px}
+.progress-info .prog-detail{font-size:11px;color:var(--text-secondary);line-height:1.5}
+.progress-info .warn{color:var(--sunset-deep);font-weight:600}
+
+.chat-area{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}
+.chat-bubble{max-width:85%;padding:10px 13px;border-radius:18px;font-size:13px;line-height:1.55;animation:msgIn 0.35s ease-out;word-break:break-word}
+.chat-bubble.assistant{align-self:flex-start;background:#fff;border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
+.chat-bubble.user{align-self:flex-end;background:var(--dusty-blue-deep);color:#fff;border-bottom-right-radius:4px}
+.chat-bubble.system{align-self:center;font-size:11px;color:var(--text-muted);padding:4px 12px;border-radius:10px;background:rgba(0,0,0,0.03)}
+@keyframes msgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* --- RICH AI CARD --- */
+.rich-card{align-self:flex-start;max-width:90%;background:#fff;border-radius:16px;border-bottom-left-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,0.06);overflow:hidden;animation:msgIn 0.4s ease-out}
+.rich-card .card-header{padding:10px 14px 6px;font-size:13px;font-weight:600}
+.rich-card .card-body{padding:6px 14px 12px;font-size:12px;color:var(--text-secondary);line-height:1.6}
+.rich-card .card-footer{padding:8px 14px;border-top:1px solid rgba(0,0,0,0.04);display:flex;gap:6px}
+.rich-card .mini-stat{flex:1;text-align:center}
+.rich-card .mini-stat .val{font-size:14px;font-weight:700;display:block}
+.rich-card .mini-stat .lab{font-size:9px;color:var(--text-muted)}
+
+/* --- BODY MAP CARD --- */
+.body-map-card{align-self:flex-start;max-width:92%;background:#fff;border-radius:16px;border-bottom-left-radius:4px;box-shadow:0 2px 12px rgba(0,0,0,0.07);overflow:hidden;animation:msgIn 0.5s ease-out}
+.body-map-card .bm-header{padding:10px 14px 6px;font-size:12px;font-weight:600;color:var(--sunset-deep);display:flex;align-items:center;gap:6px}
+.body-map-card .bm-body{display:flex;align-items:center;padding:0 14px 8px;gap:12px}
+.body-map-card .bm-svg{flex-shrink:0}
+.body-map-card .bm-explain{flex:1;font-size:12px;color:var(--text-secondary);line-height:1.6}
+.body-map-card .bm-explain b{color:var(--sunset-deep)}
+.body-map-card .bm-footer{padding:8px 14px;border-top:1px solid rgba(0,0,0,0.04);font-size:10px;color:var(--text-muted);text-align:center}
+
+/* Body map glow animation */
+@keyframes organGlow{0%,100%{opacity:0.25;r:8}50%{opacity:0.8;r:12}}
+.body-glow{animation:organGlow 2s ease-in-out infinite}
+
+/* --- REPORTED STATUS CARD --- */
+.reported-card{align-self:flex-start;max-width:90%;background:#fff;border-radius:16px;border-left:3px solid var(--sunset-deep);box-shadow:0 2px 8px rgba(0,0,0,0.06);padding:12px 14px;animation:msgIn 0.4s ease-out}
+.reported-card .rc-status{font-size:11px;font-weight:600;color:var(--sunset-deep);display:flex;align-items:center;gap:4px;margin-bottom:4px}
+.reported-card .rc-body{font-size:12px;color:var(--text-secondary);line-height:1.5}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:0.3}}
+.reported-card .dot{width:7px;height:7px;border-radius:50%;background:var(--sunset-deep);display:inline-block;animation:pulse-dot 1.5s infinite}
+
+/* --- PRESCRIPTION UPDATE CARD --- */
+.rx-update-card{align-self:flex-start;max-width:90%;background:#fff;border-radius:16px;border:1.5px solid rgba(143,168,138,0.5);box-shadow:0 2px 12px rgba(143,168,138,0.15);overflow:hidden;animation:msgIn 0.5s ease-out}
+.rx-update-card .rx-header{padding:10px 14px 6px;font-size:12px;font-weight:600;color:var(--sage-deep);display:flex;align-items:center;gap:6px}
+.rx-update-card .rx-body{padding:6px 14px 12px;font-size:12px;color:var(--text-secondary);line-height:1.6}
+.rx-update-card .rx-body .old{text-decoration:line-through;color:var(--dusty-deep)}
+.rx-update-card .rx-body .new{color:var(--sage-deep);font-weight:600}
+.rx-update-card .rx-footer{padding:8px 14px;border-top:1px solid rgba(143,168,138,0.2);display:flex;gap:6px}
+
+/* --- ACTION BAR --- */
+.action-bar{padding:10px 14px 16px;background:rgba(255,255,255,0.55);border-top:1px solid rgba(0,0,0,0.05);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.action-bar .input-row{display:flex;gap:8px;margin-bottom:8px}
+.action-bar .chat-input{flex:1;padding:10px 14px;border:1px solid rgba(0,0,0,0.1);border-radius:20px;font-size:13px;outline:none;background:rgba(255,255,255,0.7)}
+.action-bar .send-btn{width:38px;height:38px;border-radius:50%;border:none;background:var(--dusty-blue-deep);color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;transition:all 0.2s}
+.action-bar .send-btn:active{transform:scale(0.9)}
+.action-bar .quick-row{display:flex;flex-wrap:wrap;gap:6px}
+.quick-btn{padding:7px 13px;border-radius:14px;border:1px solid var(--dusty-blue);color:var(--dusty-blue-deep);background:rgba(255,255,255,0.6);font-size:11px;cursor:pointer;transition:all 0.2s;white-space:nowrap}
+.quick-btn:hover{background:var(--dusty-blue);color:#fff}
+.quick-btn:active{transform:scale(0.94)}
+.quick-btn.urgent{border-color:var(--dusty-deep);color:var(--dusty-deep)}
+.quick-btn.safe{border-color:var(--sage-deep);color:var(--sage-deep)}
+.quick-btn.safe:hover{background:var(--sage-deep);color:#fff}
+
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:20px;background:#4A4543;color:#fff;font-size:11px;z-index:100;opacity:0;transition:opacity 0.3s}
+.toast.show{opacity:0.92}
+</style>
+</head>
+<body>
+<div class="phone-frame">
+  <div class="phone-notch">9:41</div>
+
+  <div class="chat-header">
+    <div class="avatar" id="headerAvatar">张</div>
+    <div><div class="title" id="headerName">PharmSandbox 用药助手</div><div class="sub">GNN智能监测 · 在线</div></div>
+  </div>
+
+  <div class="progress-area" id="progressArea"></div>
+
+  <div class="chat-area" id="chatArea"></div>
+
+  <div class="action-bar" id="actionBar">
+    <div class="input-row">
+      <input class="chat-input" id="chatInput" placeholder="描述您的不适症状..." onkeydown="if(event.key==='Enter')sendFreeText()">
+      <button class="send-btn" onclick="sendFreeText()">↑</button>
+    </div>
+    <div class="quick-row" id="quickReplies"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ==================== STATE ====================
+const patient = JSON.parse(localStorage.getItem('pharmsandbox_active_patient')||'{}');
+const hasPatient = patient.id;
+const patientName = patient.name||'患者';
+const patientDrugs = patient.drugs||['未知药物'];
+const drugA = patientDrugs[0]||'药物A';
+const drugB = patientDrugs.length>1 ? patientDrugs[1] : (patientDrugs[0]||'药物B');
+let chatStarted = false;
+
+// ==================== INIT ====================
+document.addEventListener('DOMContentLoaded', () => {
+  if (!hasPatient) {
+    document.getElementById('chatArea').innerHTML = '<div class="chat-bubble assistant">请在医生工作台选择一个患者后再打开此页面</div>';
+    document.getElementById('progressArea').style.display='none';
+    document.getElementById('actionBar').style.display='none';
+    return;
+  }
+  document.getElementById('headerAvatar').textContent = patientName[0]||'?';
+  document.getElementById('headerName').textContent = `${patientName} 的用药助手`;
+  renderProgress();
+  // Initial greeting
+  setTimeout(() => {
+    addMessage(`<b>${patientName}您好！</b>我是 PharmSandbox 智能用药助手。<br><br>我正在通过 GNN 知识图谱实时监测您的用药安全。您正在服用 <b>${drugA}</b>${drugB!==drugA?` 和 <b>${drugB}</b>`:''}，对吗？<br><br>最近服药后有没有出现以下不适？`,'assistant');
+    renderQuickReplies(['有点水肿/乏力 😣','没有不适，挺好的 ✅','关节/肌肉有些疼痛'],'init');
+    chatStarted = true;
+  }, 600);
+});
+
+// ==================== PROGRESS RING ====================
+function renderProgress() {
+  const remainingDays = 2 + Math.floor(Math.random() * 6);
+  const urgent = remainingDays <= 4;
+  const pct = remainingDays / 30;
+  const circ = 2 * Math.PI * 32;
+  document.getElementById('progressArea').innerHTML = `
+    <svg width="76" height="76" viewBox="0 0 76 76">
+      <circle cx="38" cy="38" r="32" fill="none" stroke="#e8e3dd" stroke-width="5"/>
+      <circle cx="38" cy="38" r="32" fill="none" stroke="${urgent?'#C4A8A2':'#8FA88A'}" stroke-width="5"
+        stroke-dasharray="${(pct*circ).toFixed(0)} ${circ}" stroke-linecap="round"
+        transform="rotate(-90 38 38)" style="transition:all 0.5s ease"/>
+      <text x="38" y="36" text-anchor="middle" font-size="20" fill="${urgent?'#A67F78':'#4A4543'}" font-weight="700">${remainingDays}</text>
+      <text x="38" y="48" text-anchor="middle" font-size="7" fill="#8A827E">剩余天数</text>
+    </svg>
+    <div class="progress-info">
+      <div class="prog-title">${urgent?'⚠️ 需续方关注':'✅ 用药正常'}</div>
+      <div class="prog-detail">
+        💊 <b>${drugA}</b> | 💊 <b>${drugB}</b><br>
+        ${urgent?`<span class="warn">⚠ 仅剩 ${remainingDays} 天用量</span>`:'<span style="color:var(--sage-deep)">✓ 药物余量充足</span>'}
+      </div>
+    </div>`;
+}
+
+// ==================== MESSAGE HELPERS ====================
+function addMessage(text, role) {
+  const chat = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = `chat-bubble ${role}`;
+  div.innerHTML = text;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function addSystemMsg(text) {
+  const chat = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = 'chat-bubble system';
+  div.textContent = text;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function addBodyMapCard(drugs, symptom) {
+  const chat = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = 'body-map-card';
+  // Select highlighted organ based on symptom keywords
+  const isKidney = /肿|肾|尿|水/i.test(symptom);
+  const isLiver = /肝|黄|ALT/i.test(symptom);
+  const isGI = /胃|吐|恶心|腹泻|腹/i.test(symptom);
+  const isHeart = /心|胸|悸|血压/i.test(symptom);
+  const highlight = isKidney ? {organ:'肾脏区域',cx:95,cy:148,label:'代谢循环受阻'} :
+                    isLiver  ? {organ:'肝脏区域',cx:115,cy:135,label:'代谢压力升高'} :
+                    isGI     ? {organ:'消化道',cx:110,cy:195,label:'消化道反应'} :
+                    isHeart  ? {organ:'心血管',cx:110,cy:125,label:'心血管负荷'} :
+                               {organ:'全身',cx:110,cy:150,label:'系统感知异常'};
+  div.innerHTML = `
+    <div class="bm-header">🩺 可视化体征图谱 — ${highlight.organ}</div>
+    <div class="bm-body">
+      <svg class="bm-svg" width="100" height="210" viewBox="0 0 220 300">
+        <!-- Silhouette -->
+        <ellipse cx="110" cy="55" rx="35" ry="42" fill="none" stroke="#D5CEC8" stroke-width="1.5"/>
+        <line x1="110" y1="97" x2="110" y2="250" stroke="#D5CEC8" stroke-width="1.5"/>
+        <line x1="110" y1="110" x2="65" y2="160" stroke="#D5CEC8" stroke-width="1.2"/>
+        <line x1="110" y1="110" x2="155" y2="160" stroke="#D5CEC8" stroke-width="1.2"/>
+        <line x1="110" y1="250" x2="85" y2="295" stroke="#D5CEC8" stroke-width="1.2"/>
+        <line x1="110" y1="250" x2="135" y2="295" stroke="#D5CEC8" stroke-width="1.2"/>
+        <!-- Glow circle on affected organ -->
+        <circle cx="${highlight.cx}" cy="${highlight.cy}" r="8" fill="none" stroke="#D4955C" stroke-width="2.5" class="body-glow"/>
+        <circle cx="${highlight.cx}" cy="${highlight.cy}" r="4" fill="#D4955C" opacity="0.4"/>
+        <!-- Label -->
+        <text x="110" y="275" text-anchor="middle" font-size="9" fill="#8A827E">${highlight.label}</text>
+      </svg>
+      <div class="bm-explain">
+        系统感知到您的<b>${highlight.organ}</b>存在<b>${highlight.label}</b>。<br><br>
+        您服用的<b>【${drugs[0]}】</b>${drugs.length>1?`与<b>【${drugs[1]}】</b>联用`:''}可能加重了这一反应，导致轻度体液潴留（水肿现象）。<br><br>这是药物副作用的常见表现——<b>请不必过度担心</b>，但需要医生介入评估。
+      </div>
+    </div>
+    <div class="bm-footer">⚕️ GNN 药物知识图谱推演 · 仅供参考，不能替代医生诊断</div>
+  `;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function addReportedCard() {
+  const chat = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = 'reported-card';
+  div.innerHTML = `
+    <div class="rc-status"><span class="dot"></span> 结构化报告已生成 · 已上报王医生</div>
+    <div class="rc-body">
+      请您不要惊慌，我已经将这一高危异常整理为<b>结构化临床报告</b>，并实时推送至<b>王医生的待诊工作台</b>。<br><br>
+      📋 <b>报告内容：</b><br>
+      · 患者自述：下肢水肿<br>
+      · 关联药物：${drugA} + ${drugB}<br>
+      · GNN 风险评分：上升至 <b style="color:#A67F78">78分（高危）</b><br>
+      · 建议：评估替代药物方案<br><br>
+      王医生正在为您评估是否需要调整处方，请您耐心等待...
+    </div>
+  `;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function addPrescriptionCard(newDrug, oldDrug) {
+  const chat = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = 'rx-update-card';
+  div.innerHTML = `
+    <div class="rx-header">✅ 处方已优化 — 王医生刚刚完成评估</div>
+    <div class="rx-body">
+      王医生已为您调整用药方案：<br><br>
+      将 <span class="old">${oldDrug}</span> 平替为 <span class="new">${newDrug}</span><br><br>
+      <b>变更理由：</b>新的替代药物在保持同等疗效的同时，将有效规避您当前的水肿等代谢副作用。<br><br>
+      📦 <b>新药方已下发</b>，预计明日上午配送到家。
+    </div>
+    <div class="rx-footer">
+      <div class="mini-stat"><span class="val" style="color:var(--sage-deep)">已更换</span><span class="lab">处方状态</span></div>
+      <div class="mini-stat"><span class="val" style="color:var(--sage-deep)">明日</span><span class="lab">预计送达</span></div>
+      <div class="mini-stat"><span class="val" style="color:var(--dusty-blue-deep)">王医生</span><span class="lab">审核医师</span></div>
+    </div>
+  `;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+// ==================== QUICK REPLIES ====================
+function renderQuickReplies(replies, context) {
+  const container = document.getElementById('quickReplies');
+  container.innerHTML = replies.map((r, i) => {
+    const isUrgent = /肿|乏力|疼痛|不适/.test(r) && !/没有|挺好/.test(r);
+    const isSafe = /没有|挺好|谢谢|明白/.test(r);
+    return `<button class="quick-btn${isUrgent?' urgent':''}${isSafe?' safe':''}" data-idx="${i}" data-ctx="${context}">${r}</button>`;
+  }).join('');
+
+  container.querySelectorAll('.quick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.textContent;
+      const ctx = btn.dataset.ctx;
+      addMessage(text, 'user');
+      handleReply(text, ctx);
+    });
+  });
+}
+
+// ==================== 4-STEP CINEMATIC FLOW ====================
+function handleReply(text, ctx) {
+  if (/肿|乏力/.test(text) && !/没有/.test(text)) {
+    // ====== STEP 1: Natural language安抚+药理解析 ======
+    setTimeout(() => {
+      addMessage(
+        `收到您的反馈。结合您的电子健康档案和化验数据，我注意到您目前服用的<b>【${drugA}】</b>与<b>【${drugB}】</b>联用时，可能通过<b>竞争肾小管代谢通路</b>加重肾脏排泄压力，从而导致轻度<b>体液潴留（水肿）</b>。<br><br>这在临床上属于<b>需要关注的药物相互作用信号</b>。`,
+        'assistant'
+      );
+    }, 400);
+
+    // ====== STEP 2: Body Map Card (after 1.5s) ======
+    setTimeout(() => {
+      addBodyMapCard([drugA, drugB], text);
+    }, 1800);
+
+    // ====== STEP 3: Reported status card (after 3s) ======
+    setTimeout(() => {
+      // Alert doctor workstation
+      alertDoctor(text);
+      addReportedCard();
+      renderQuickReplies(['好的，我等待医生回复 🤞','我需要立即去医院吗？'],'waiting');
+    }, 3500);
+
+  } else if (/没有|挺好|不错/.test(text)) {
+    setTimeout(() => {
+      addMessage(`很高兴听到您状态良好！👍<br><br>请继续保持按时服药。我正在后台持续监测您的<b>${drugA}</b>和<b>${drugB}</b>的血药浓度与代谢指标，如有异常会第一时间通知您。`,'assistant');
+      renderQuickReplies(['好的，谢谢 💚','查看我的用药报告'],'normal');
+    }, 500);
+
+  } else if (/疼痛|痛/.test(text)) {
+    setTimeout(() => {
+      addMessage(`了解。关节/肌肉疼痛可能与<b>${drugB}</b>的常见副作用有关。<br><br>结合您的GNN知识图谱分析，这属于<b>中等风险信号</b>——虽然不致命，但会影响您的生活质量。`,'assistant');
+    }, 500);
+    setTimeout(() => {
+      addBodyMapCard([drugA, drugB], text);
+      addMessage('我已将这一症状记录在案。建议您在下次复诊时与医生详细讨论。<br>如需立即缓解，请<b>不要自行加服止痛药</b>——这可能会引入新的DDI风险。','assistant');
+      renderQuickReplies(['好的，我会注意','可以吃对乙酰氨基酚吗？'],'pain');
+    }, 1500);
+
+  } else if (/医院|急诊/.test(text)) {
+    setTimeout(() => {
+      addMessage('如果出现<b>严重呼吸困难、尿量骤减</b>或<b>意识模糊</b>，请<b>立即拨打120或前往最近急诊科</b>！<br><br>如果症状尚可忍受，王医生今天内会给您回复，请耐心等待。','assistant');
+      renderQuickReplies(['好的，我观察一下','我的情况严重吗？'],'waiting');
+    }, 600);
+
+  } else if (/用药报告|报告/.test(text)) {
+    setTimeout(() => {
+      const div = document.createElement('div');
+      div.className = 'rich-card';
+      div.innerHTML = `
+        <div class="card-header" style="color:var(--dusty-blue-deep)">📋 您的个体化用药安全报告</div>
+        <div class="card-body">
+          <b>当前处方：</b>${patientDrugs.join('、')}<br>
+          <b>诊断：</b>${(patient.conditions||['无']).join('、')}<br>
+          <b>GNN风险评分：</b><b style="color:#8FA88A">低风险</b>（12分）<br>
+          <b>监测状态：</b>✅ 持续监测中
+        </div>
+        <div class="card-footer">
+          <div class="mini-stat"><span class="val" style="color:var(--sage-deep)">12</span><span class="lab">风险评分</span></div>
+          <div class="mini-stat"><span class="val" style="color:var(--dusty-blue-deep)">${patientDrugs.length}</span><span class="lab">处方药数</span></div>
+          <div class="mini-stat"><span class="val" style="color:var(--sage-deep)">无</span><span class="lab">DDI交互</span></div>
+        </div>
+      `;
+      document.getElementById('chatArea').appendChild(div);
+      document.getElementById('chatArea').scrollTop = document.getElementById('chatArea').scrollHeight;
+      renderQuickReplies(['好的，谢谢','有什么需要注意的吗？'],'normal');
+    }, 700);
+
+  } else {
+    setTimeout(() => {
+      addMessage('感谢您的反馈！我已将信息记录并同步至您的主管医生。如有任何不适，请随时联系我。🏥','assistant');
+      renderQuickReplies(['💊 查看用药安全','📊 身体状态反馈'],'normal');
+    }, 600);
+  }
+}
+
+// ==================== DOCTOR RESPONSE SIMULATION ====================
+function alertDoctor(symptom) {
+  const alert = {
+    patientId: patient.id, alertType:'patient_symptom',
+    message:`${patientName} 自述: ${symptom}`,
+    time: new Date().toISOString()
+  };
+  localStorage.setItem('pharmsandbox_patient_alert', JSON.stringify(alert));
+  showToast('🏥 已紧急上报至医生工作站');
+
+  // Simulate doctor resolving after ~12 seconds (demo timing)
+  // In real demo: switch to doctor page, do sandbox, click process, switch back
+  // For automated demo: setTimeout simulates doctor response
+  const oldDrug = drugB;
+  const newDrug = 'acetaminophen'; // 对乙酰氨基酚 as safe alternative
+  setTimeout(() => {
+    addSystemMsg('── 王医生已完成评估 ──');
+    setTimeout(() => addPrescriptionCard(newDrug, oldDrug), 300);
+    setTimeout(() => renderQuickReplies(['太好了，谢谢医生！💚','新药有什么注意事项？'],'resolved'), 500);
+    // Update localStorage so doctor page sees it
+    let processed = JSON.parse(localStorage.getItem('pharmsandbox_processed')||'[]');
+    if (!processed.includes(patient.id)) processed.push(patient.id);
+    localStorage.setItem('pharmsandbox_processed', JSON.stringify(processed));
+  }, 12000);
+}
+
+// ==================== FREE TEXT ====================
+function sendFreeText() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  addMessage(text, 'user');
+  input.value = '';
+  setTimeout(() => {
+    addMessage('收到。正在分析您的描述...','assistant');
+    // Simple keyword routing
+    if (/肿|水|浮/i.test(text)) handleReply('有点水肿','free');
+    else if (/痛|疼/i.test(text)) handleReply('有些疼痛','free');
+    else handleReply('其他', 'free');
+  }, 600);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ==================== LISTEN FOR DOCTOR ACTION (cross-window) ====================
+// If doctor processes the patient in another tab, update this page
+setInterval(() => {
+  const processed = JSON.parse(localStorage.getItem('pharmsandbox_processed')||'[]');
+  const doctorAction = JSON.parse(localStorage.getItem('pharmsandbox_doctor_action')||'null');
+  if (doctorAction && doctorAction.patientId === patient.id && doctorAction.action === 'new_prescription') {
+    // Clear to avoid re-triggering
+    localStorage.removeItem('pharmsandbox_doctor_action');
+    addSystemMsg('── 王医生刚刚完成了处方调整 ──');
+    setTimeout(() => addPrescriptionCard('对乙酰氨基酚', drugB), 300);
+    setTimeout(() => renderQuickReplies(['太好了，谢谢医生！💚','新药有什么注意事项？'],'resolved'), 500);
+  }
+  if (processed.includes(patient.id) && !document.querySelector('.rx-update-card')) {
+    // Update progress bar to show processed
+  }
+}, 3000);
+</script>
+</body>
+</html>

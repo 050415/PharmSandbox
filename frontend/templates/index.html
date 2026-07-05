@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PharmSandbox 药盘推演</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.6/dist/vis-network.min.js"></script>
+<style>
+/* ============================================================
+   MORANDI COLOR SYSTEM + GLASSMORPHISM + BENTO UI
+   ============================================================ */
+:root {
+  --bg-oat:        #F5F0EB;
+  --bg-card:       rgba(255,255,255,0.55);
+  --border-card:   rgba(180,170,160,0.25);
+
+  --sage:          #B5C4B1;
+  --sage-deep:     #8FA88A;
+  --sage-bg:       rgba(181,196,177,0.18);
+  --sunset:        #E8B98D;
+  --sunset-deep:   #D4955C;
+  --sunset-bg:     rgba(232,185,141,0.16);
+  --dusty-rose:    #C4A8A2;
+  --dusty-deep:    #A67F78;
+  --rose-bg:       rgba(196,168,162,0.16);
+  --dusty-blue:    #9CAEBF;
+  --dusty-blue-deep:#738A9F;
+  --blue-bg:       rgba(156,174,191,0.18);
+  --blue-bg-light: rgba(156,174,191,0.08);
+
+  --text-primary:  #4A4543;
+  --text-secondary:#8A827E;
+  --text-muted:    #B5AFAA;
+  --white:         #FFFFFF;
+
+  --glass-blur:    14px;
+  --glass-border:  1px solid rgba(255,255,255,0.45);
+  --shadow-sm:     0 1px 3px rgba(74,69,67,0.06);
+  --shadow-md:     0 4px 16px rgba(74,69,67,0.08);
+  --shadow-lg:     0 8px 32px rgba(74,69,67,0.10);
+
+  --left-width:    380px;
+  --radius:        16px;
+  --radius-sm:     10px;
+  --transition:    0.28s cubic-bezier(0.4,0,0.2,1);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+               "Microsoft YaHei", sans-serif;
+  background: var(--bg-oat);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   MAIN LAYOUT - BENTO GRID
+   ============================================================ */
+.app-shell {
+  display: grid;
+  grid-template-columns: var(--left-width) 1fr;
+  min-height: 100vh;
+}
+
+/* ---- LEFT PANEL ---- */
+.sidebar {
+  position: sticky; top: 0;
+  height: 100vh; overflow-y: auto;
+  padding: 24px 20px;
+  display: flex; flex-direction: column; gap: 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(245,240,235,0.70) 100%);
+  border-right: var(--border-card);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  z-index: 10;
+}
+
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 4px; }
+
+.sidebar .brand { font-size:22px; font-weight:700; color:var(--dusty-blue-deep); letter-spacing:-0.3px; }
+.sidebar .brand span { font-weight:400; font-size:14px; color:var(--text-secondary); display:block; margin-top:2px; }
+
+/* ---- Glass Card ---- */
+.glass-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: var(--glass-border);
+  border-radius: var(--radius);
+  padding: 18px 16px;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+.glass-card:hover { box-shadow: var(--shadow-md); }
+
+.glass-card h3 {
+  font-size:13px; font-weight:600; color:var(--text-secondary);
+  text-transform:uppercase; letter-spacing:0.5px; margin-bottom:14px;
+  display:flex; align-items:center; gap:6px;
+}
+
+/* ---- Form Elements ---- */
+label { font-size:12px; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:4px; }
+input[type="text"], input[type="number"], textarea, select {
+  width:100%; padding:9px 12px; border:1px solid var(--border-card);
+  border-radius:var(--radius-sm); font-size:14px; font-family:inherit;
+  background:rgba(255,255,255,0.55); color:var(--text-primary);
+  transition:var(--transition); outline:none;
+}
+input:focus, textarea:focus, select:focus { border-color:var(--dusty-blue); box-shadow:0 0 0 3px var(--blue-bg-light); }
+textarea { resize:vertical; min-height:60px; }
+
+.inline-row { display:flex; gap:10px; }
+.inline-row > * { flex:1; }
+.lab-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.lab-grid .unit { position:relative; }
+.lab-grid .unit::after {
+  content:attr(data-unit); position:absolute; right:12px; top:50%;
+  transform:translateY(-50%); color:var(--text-muted); font-size:11px; pointer-events:none;
+}
+.lab-grid input { padding-right:50px; }
+
+/* Slider */
+input[type="range"] {
+  -webkit-appearance:none; appearance:none; width:100%; height:6px;
+  background:linear-gradient(90deg, var(--dusty-blue), var(--sage));
+  border-radius:3px; outline:none; margin-top:8px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:20px; height:20px; border-radius:50%;
+  background:var(--white); border:2px solid var(--dusty-blue-deep);
+  cursor:pointer; box-shadow:var(--shadow-sm);
+}
+.range-label { display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-top:4px; }
+
+/* Tags */
+.tag-container { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.tag {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:4px 10px; border-radius:20px; font-size:12px; font-weight:500;
+  animation: tagIn 0.25s ease-out;
+}
+.tag-success { background:var(--sage-bg); color:var(--sage-deep); border:1px solid rgba(143,168,138,0.35); }
+.tag-warning { background:var(--sunset-bg); color:var(--sunset-deep); border:1px solid rgba(212,149,92,0.35); }
+.tag-remove { cursor:pointer; font-size:14px; line-height:1; opacity:0.6; }
+.tag-remove:hover { opacity:1; }
+@keyframes tagIn { from { opacity:0; transform:scale(0.85); } to { opacity:1; transform:scale(1); } }
+
+/* Primary Button */
+.btn-primary {
+  width:100%; padding:12px 20px; border:none; border-radius:var(--radius-sm);
+  background:var(--dusty-blue-deep); color:var(--white);
+  font-size:15px; font-weight:600; cursor:pointer;
+  letter-spacing:0.3px; transition:var(--transition);
+  box-shadow:0 2px 8px rgba(115,138,159,0.25);
+}
+.btn-primary:hover { background:#688097; box-shadow:0 4px 16px rgba(115,138,159,0.35); transform:translateY(-1px); }
+.btn-primary:disabled { background:var(--text-muted); cursor:not-allowed; box-shadow:none; transform:none; }
+
+.btn-ghost {
+  background:transparent; border:1px solid var(--border-card); border-radius:var(--radius-sm);
+  padding:8px 16px; color:var(--text-secondary); font-size:13px; cursor:pointer; transition:var(--transition);
+}
+.btn-ghost:hover { background:rgba(0,0,0,0.03); border-color:var(--text-muted); }
+
+/* ---- RIGHT PANEL ---- */
+.main-area { padding:20px 24px; display:flex; flex-direction:column; gap:16px; overflow-y:auto; }
+
+/* Status Pills */
+.status-bar { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.status-pill {
+  padding:5px 14px; border-radius:20px; font-size:11px; font-weight:500;
+  background:var(--blue-bg-light); color:var(--dusty-blue-deep);
+}
+.status-pill.good { background:var(--sage-bg); color:var(--sage-deep); }
+.status-pill.warn { background:var(--sunset-bg); color:var(--sunset-deep); }
+
+/* Top Bar */
+.top-bar { display:flex; justify-content:space-between; align-items:center; }
+.top-bar h1 { font-size:24px; font-weight:700; color:var(--dusty-blue-deep); }
+.top-bar .subtitle { font-size:13px; color:var(--text-secondary); margin-left:10px; }
+
+/* Summary Banner */
+.summary-banner {
+  padding:14px 20px; border-radius:var(--radius); font-size:14px; font-weight:500;
+  display:none; transition:var(--transition);
+  background:var(--bg-card); backdrop-filter:blur(var(--glass-blur));
+  -webkit-backdrop-filter:blur(var(--glass-blur)); border:var(--glass-border);
+}
+.summary-banner.show { display:block; }
+.summary-banner.level-safe     { background:var(--sage-bg); border-left:4px solid var(--sage-deep); }
+.summary-banner.level-low      { background:var(--sage-bg); border-left:4px solid var(--sage-deep); }
+.summary-banner.level-medium   { background:var(--sunset-bg);border-left:4px solid var(--sunset-deep); }
+.summary-banner.level-high     { background:var(--rose-bg); border-left:4px solid var(--dusty-deep); }
+.summary-banner.level-critical { background:var(--rose-bg); border-left:4px solid #A0525A; }
+
+/* ---- TABS ---- */
+.tab-nav { display:flex; gap:4px; background:var(--bg-card); border-radius:var(--radius-sm); padding:4px; }
+.tab-btn {
+  flex:1; padding:10px 16px; border:none; border-radius:8px;
+  background:transparent; font-size:13px; font-weight:500; cursor:pointer;
+  color:var(--text-secondary); transition:var(--transition);
+}
+.tab-btn.active { background:var(--white); color:var(--dusty-blue-deep); box-shadow:var(--shadow-sm); font-weight:600; }
+.tab-btn:hover:not(.active) { color:var(--text-primary); }
+
+.tab-panel { display:none; }
+.tab-panel.active { display:block; }
+
+/* ---- BENTO GRID ---- */
+.bento-grid { display:grid; gap:16px; margin-top:12px; }
+.bento-2col { grid-template-columns:1fr 1fr; }
+.bento-3col { grid-template-columns:1fr 1fr 1fr; }
+.bento-full { grid-template-columns:1fr; }
+
+/* ---- Gauge ---- */
+.gauge-wrapper { text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.gauge-svg { width:100%; max-width:220px; height:auto; aspect-ratio:220/120; margin:0 auto; }
+.gauge-value { font-size:40px; font-weight:700; line-height:1; margin-top:-8px; }
+.gauge-label { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+.ai-badge {
+  display:inline-block; padding:3px 10px; border-radius:12px;
+  font-size:10px; font-weight:600; margin-top:6px;
+}
+.ai-badge.gnn { background:var(--blue-bg); color:var(--dusty-blue-deep); }
+.ai-badge.rule { background:var(--sunset-bg); color:var(--sunset-deep); }
+
+/* Radar */
+.radar-container { height:300px; }
+
+/* ---- DDI Cards ---- */
+.ddi-list { display:flex; flex-direction:column; gap:10px; max-height:500px; overflow-y:auto; }
+.ddi-card {
+  background:var(--bg-card); backdrop-filter:blur(var(--glass-blur));
+  -webkit-backdrop-filter:blur(var(--glass-blur)); border:var(--glass-border);
+  border-radius:var(--radius-sm); padding:14px 16px; cursor:pointer; transition:var(--transition);
+}
+.ddi-card:hover { box-shadow:var(--shadow-md); }
+.ddi-card.severity-high    { border-left:4px solid var(--dusty-deep); }
+.ddi-card.severity-moderate{ border-left:4px solid var(--sunset-deep); }
+.ddi-card.severity-mild    { border-left:4px solid var(--sage-deep); }
+.ddi-card-header { display:flex; justify-content:space-between; align-items:center; }
+.ddi-drugs { font-weight:600; font-size:14px; }
+.ddi-se-count { font-size:12px; color:var(--text-secondary); }
+.ddi-effects { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
+.ddi-effect-tag {
+  padding:2px 8px; border-radius:12px; font-size:11px;
+  background:var(--blue-bg-light); color:var(--dusty-blue-deep);
+}
+.ddi-confidence {
+  font-size:10px; padding:2px 8px; border-radius:10px;
+  background:var(--blue-bg); color:var(--dusty-blue-deep);
+}
+.ddi-explain {
+  display:none; margin-top:10px; padding:12px; border-radius:var(--radius-sm);
+  background:rgba(74,69,67,0.03); color:var(--text-secondary); font-size:13px; line-height:1.7;
+}
+.ddi-explain.show { display:block; }
+.ddi-toggle-btn {
+  margin-top:10px; font-size:12px; color:var(--dusty-blue-deep);
+  cursor:pointer; background:none; border:none; padding:0;
+}
+
+/* ---- Alternative Cards ---- */
+.alt-comparison { display:flex; align-items:stretch; gap:20px; }
+.alt-original, .alt-candidate {
+  flex:1; padding:16px; border-radius:var(--radius-sm);
+  background:var(--bg-card); border:var(--glass-border);
+}
+.alt-original { border-left:3px solid var(--dusty-deep); }
+.alt-candidate { border-left:3px solid var(--sage-deep); }
+.alt-candidate:hover { box-shadow:var(--shadow-md); }
+.alt-score-circle {
+  width:56px; height:56px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:18px; margin:0 auto 8px;
+}
+.alt-score-circle.high { background:var(--sage-bg); color:var(--sage-deep); }
+.alt-score-circle.mid  { background:var(--sunset-bg); color:var(--sunset-deep); }
+.alt-reasons { font-size:12px; color:var(--text-secondary); margin-top:8px; }
+.alt-reasons li { margin-bottom:4px; }
+
+/* Explain modal */
+.alt-explain-btn { font-size:12px; color:var(--dusty-blue-deep); cursor:pointer; margin-top:8px; background:none; border:none; }
+.explain-overlay {
+  display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(74,69,67,0.3); z-index:100;
+  backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+}
+.explain-overlay.show { display:flex; align-items:center; justify-content:center; }
+.explain-panel {
+  background:var(--white); border-radius:var(--radius); padding:28px;
+  max-width:560px; width:90%; box-shadow:var(--shadow-lg);
+}
+.explain-panel h3 { margin-bottom:16px; color:var(--dusty-blue-deep); }
+.explain-compare { display:flex; gap:20px; }
+.explain-compare > div { flex:1; }
+.explain-keep { color:var(--sage-deep); }
+.explain-drop { color:var(--dusty-deep); text-decoration:line-through; }
+.explain-close { margin-top:16px; }
+
+/* ---- Knowledge Graph ---- */
+.graph-container { height:420px; border-radius:var(--radius-sm); overflow:hidden; background:rgba(255,255,255,0.35); }
+.side-chart { height:200px; }
+
+/* ---- Gantt ---- */
+.gantt-container { padding:12px 0; }
+.gantt-row { display:flex; align-items:center; margin-bottom:10px; gap:10px; }
+.gantt-label { width:120px; font-size:12px; font-weight:500; text-align:right; flex-shrink:0; }
+.gantt-track { flex:1; height:22px; background:rgba(0,0,0,0.04); border-radius:11px; position:relative; overflow:visible; }
+.gantt-bar {
+  position:absolute; height:100%; border-radius:11px; top:0;
+  background:var(--dusty-blue); opacity:0.85;
+  display:flex; align-items:center; padding-left:8px; font-size:10px; color:var(--white);
+}
+.gantt-bar.used { background:var(--sage); }
+.gantt-bar.remaining { background:var(--sunset); }
+.gantt-bar.expired { background:var(--dusty-rose); }
+.gantt-marker { position:absolute; top:-4px; width:2px; height:30px; background:var(--dusty-deep); z-index:2; }
+.gantt-refill-btn {
+  font-size:10px; padding:3px 8px; border:none; border-radius:10px;
+  background:var(--dusty-rose); color:var(--white); cursor:pointer;
+  animation:pulse 1.5s infinite; margin-left:8px;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+/* Refill Modal */
+.refill-modal {
+  display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(74,69,67,0.3); z-index:100;
+  backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+}
+.refill-modal.show { display:flex; align-items:center; justify-content:center; }
+.refill-draft {
+  background:var(--white); border-radius:var(--radius); padding:28px;
+  max-width:500px; width:90%; box-shadow:var(--shadow-lg);
+  font-family:monospace; font-size:13px; white-space:pre-wrap;
+}
+
+/* Loading spinner */
+.spinner-overlay {
+  display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(245,240,235,0.6); z-index:99;
+  backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px);
+}
+.spinner-overlay.show { display:flex; align-items:center; justify-content:center; flex-direction:column; }
+.dna-loader {
+  width:48px; height:48px; border:3px solid var(--dusty-blue);
+  border-radius:50%; border-top-color:transparent;
+  animation:spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.spinner-text { margin-top:12px; color:var(--dusty-blue-deep); font-size:14px; }
+
+/* Toast */
+.toast {
+  position:fixed; top:20px; right:20px; z-index:200;
+  padding:12px 20px; border-radius:var(--radius-sm); font-size:13px;
+  background:var(--white); box-shadow:var(--shadow-lg);
+  transform:translateX(120%); transition:transform 0.3s ease;
+}
+.toast.show { transform:translateX(0); }
+.toast.error { border-left:3px solid var(--dusty-deep); }
+.toast.success { border-left:3px solid var(--sage-deep); }
+
+/* Decision FAB */
+.decision-bar {
+  position:fixed; bottom:24px; right:24px; display:flex; gap:12px; z-index:50;
+  display:none;
+}
+.decision-bar.show { display:flex; }
+.decision-btn {
+  padding:14px 24px; border:none; border-radius:28px; font-size:14px; font-weight:600;
+  cursor:pointer; box-shadow:0 4px 20px rgba(0,0,0,0.15); transition:all 0.2s;
+  backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+}
+.decision-btn:hover { transform:translateY(-2px); box-shadow:0 6px 28px rgba(0,0,0,0.2); }
+.decision-btn.accept { background:var(--sage-deep); color:#fff; }
+.decision-btn.override { background:rgba(196,168,162,0.9); color:#fff; }
+
+/* Lab spike animation */
+.lab-spike { animation: spikeFlash 0.6s ease-out 3; }
+@keyframes spikeFlash { 0%,100%{color:inherit} 50%{color:var(--dusty-deep);transform:scale(1.15)} }
+
+@media (max-width:900px) {
+  .app-shell { grid-template-columns:1fr; }
+  .sidebar { position:static; height:auto; }
+  .bento-2col { grid-template-columns:1fr; }
+  .decision-bar { bottom:12px; right:12px; flex-direction:column; }
+}
+</style>
+</head>
+<body>
+
+<!-- SPINNER + TOAST -->
+<div class="spinner-overlay" id="spinner">
+  <div class="dna-loader"></div>
+  <div class="spinner-text">AI 推演进行中...</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- EXPLAIN MODAL -->
+<div class="explain-overlay" id="explainOverlay" onclick="this.classList.remove('show')">
+  <div class="explain-panel" id="explainPanel" onclick="event.stopPropagation()">
+    <h3>💡 替代推荐因果分析</h3>
+    <div class="explain-compare" id="explainCompare"></div>
+    <button class="btn-ghost explain-close" onclick="document.getElementById('explainOverlay').classList.remove('show')">关闭</button>
+  </div>
+</div>
+
+<!-- REFILL MODAL -->
+<div class="refill-modal" id="refillModal" onclick="this.classList.remove('show')">
+  <div class="refill-draft" id="refillDraft" onclick="event.stopPropagation()"></div>
+</div>
+
+<!-- ==================== APP SHELL ==================== -->
+<div class="app-shell">
+
+<!-- ====== LEFT SIDEBAR ====== -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">PharmSandbox <span>药盘推演 · GNN个体化用药决策台</span></div>
+
+  <div class="glass-card" id="card-patient">
+    <h3>🧬 患者画像与体征约束</h3>
+    <div class="inline-row" style="margin-bottom:10px">
+      <div><label>年龄</label><input type="number" id="patAge" value="65" min="0" max="120"></div>
+      <div><label>性别</label><select id="patGender"><option value="M">男</option><option value="F">女</option></select></div>
+    </div>
+    <label>疾病史（回车生成标签）</label>
+    <textarea id="patConditions" placeholder="如：糖尿病&#10;CKD 3期&#10;高血压"></textarea>
+    <div class="tag-container" id="conditionTags"></div>
+
+    <label style="margin-top:10px">化验指标 (Labs)</label>
+    <div class="lab-grid">
+      <div class="unit" data-unit="μmol/L"><input type="number" id="labCreatinine" placeholder="肌酐" step="0.1"></div>
+      <div class="unit" data-unit="U/L"><input type="number" id="labAlt" placeholder="ALT" step="0.1"></div>
+      <div class="unit" data-unit="mmol/L"><input type="number" id="labBun" placeholder="BUN" step="0.1"></div>
+      <div class="unit" data-unit="INR"><input type="number" id="labInr" placeholder="INR" step="0.1"></div>
+    </div>
+
+    <label style="margin-top:12px">续方提醒阈值 <span style="font-weight:400;color:var(--dusty-blue-deep)" id="refillDaysVal">3 天</span></label>
+    <input type="range" id="refillDays" min="1" max="14" value="3" oninput="document.getElementById('refillDaysVal').textContent=this.value+' 天'">
+  </div>
+
+  <div class="glass-card" id="card-drugs">
+    <h3>💊 药物输入与实体解析</h3>
+    <textarea id="drugInput" placeholder="支持中英文混输，逗号分隔&#10;如：aspirin, 华法林, metformin"></textarea>
+    <div class="tag-container" id="drugTags"></div>
+    <div style="margin-top:10px;font-size:11px;color:var(--text-muted)">输入后按 <b>Tab</b> 或点击空白处触发 NER 解析</div>
+  </div>
+
+  <button class="btn-primary" id="btnSimulate" onclick="runSimulation()">⚡ 开始沙盘推演</button>
+  <button class="btn-ghost" onclick="resetAll()" style="width:100%">↻ 一键重置沙盘</button>
+
+  <div class="glass-card" style="font-size:12px;color:var(--text-secondary);text-align:center">
+    <button class="btn-ghost" onclick="refreshLabValues()" style="font-size:12px;width:100%">
+      🔄 模拟物联网刷新化验指标
+    </button>
+    <div style="margin-top:4px;font-size:10px;color:var(--text-muted)">点击后随机波动或触发危急值</div>
+  </div>
+
+  <div class="glass-card" style="font-size:12px;color:var(--text-secondary)">
+    <b>快捷处方：</b>
+    <a href="#" onclick="loadPreset('elderly')" style="color:var(--dusty-blue-deep);margin-left:4px">老年多病</a> ·
+    <a href="#" onclick="loadPreset('surgery')" style="color:var(--dusty-blue-deep)">围术期</a> ·
+    <a href="#" onclick="loadPreset('cardio')" style="color:var(--dusty-blue-deep)">心血管</a>
+  </div>
+</aside>
+
+<!-- ====== RIGHT MAIN AREA ====== -->
+<main class="main-area" id="mainArea">
+  <div class="top-bar">
+    <div><h1 style="display:inline">PharmSandbox 药盘推演</h1></div>
+    <div class="status-bar" id="statusBar">
+      <span class="status-pill good" id="pillDrugs">💊 加载中...</span>
+      <span class="status-pill good" id="pillSE">🔬 加载中...</span>
+      <span class="status-pill good" id="pillPatients">👥 加载中...</span>
+      <span class="status-pill" id="pillGNN">🧠 检测中...</span>
+    </div>
+  </div>
+
+  <!-- Summary Banner -->
+  <div class="summary-banner" id="summaryBanner"></div>
+
+  <!-- Tab Nav -->
+  <div class="tab-nav" id="tabNav">
+    <button class="tab-btn active" onclick="switchTab('risk')">📊 风险量化解析</button>
+    <button class="tab-btn" onclick="switchTab('alternative')">🔄 因果替代推演</button>
+    <button class="tab-btn" onclick="switchTab('graph')">🌐 多维图谱追溯</button>
+  </div>
+
+  <!-- ====== TAB 1: RISK ====== -->
+  <div class="tab-panel active" id="tab-risk">
+    <div class="bento-grid bento-2col">
+      <div class="glass-card gauge-wrapper" id="gaugeCard">
+        <h3>📈 风险量化计分板</h3>
+        <svg class="gauge-svg" viewBox="0 0 220 120" id="gaugeSvg">
+          <defs>
+            <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#B5C4B1"/>
+              <stop offset="40%" stop-color="#E8B98D"/>
+              <stop offset="75%" stop-color="#C4A8A2"/>
+              <stop offset="100%" stop-color="#A0525A"/>
+            </linearGradient>
+          </defs>
+          <!-- Background track -->
+          <path d="M 30 100 A 80 80 0 1 1 190 100" fill="none" stroke="#E8E3DD" stroke-width="12"/>
+          <!-- Gauge fill arc -->
+          <path id="gaugeFill" d="M 110 20 A 80 80 0 0 1 110 20" fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round"/>
+          <!-- Needle -->
+          <line id="gaugeNeedle" x1="110" y1="100" x2="110" y2="32" stroke="#4A4543" stroke-width="2" stroke-linecap="round" transform="rotate(-90 110 100)"/>
+          <circle cx="110" cy="100" r="5" fill="#4A4543"/>
+        </svg>
+        <div class="gauge-value" id="gaugeScore">--</div>
+        <div class="gauge-label" id="gaugeLevel">等待推演</div>
+        <div class="ai-badge rule" id="aiBadge">⚙️ Rule-based</div>
+      </div>
+
+      <div class="glass-card">
+        <h3>🎯 六维风险雷达</h3>
+        <div class="radar-container"><canvas id="radarChart"></canvas></div>
+      </div>
+
+      <div class="glass-card">
+        <h3>🔍 归因剖析面板</h3>
+        <div id="attributionPanel" style="font-size:13px;color:var(--text-muted)">等待推演...</div>
+      </div>
+
+      <div class="glass-card">
+        <h3>⚡ DDI 冲突流瀑布</h3>
+        <div class="ddi-list" id="ddiList">
+          <div style="font-size:13px;color:var(--text-muted)">等待推演...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== TAB 2: ALTERNATIVES ====== -->
+  <div class="tab-panel" id="tab-alternative">
+    <div class="bento-grid bento-full">
+      <div class="glass-card">
+        <h3>🔄 无害化替代药因果推演</h3>
+        <div id="altContainer" style="font-size:13px;color:var(--text-muted)">等待推演...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== TAB 3: GRAPH + GANTT ====== -->
+  <div class="tab-panel" id="tab-graph">
+    <div class="bento-grid bento-2col">
+      <div class="glass-card" style="grid-column:1">
+        <h3>🕸️ 2-Hop 药物知识图谱</h3>
+        <div class="graph-container" id="graphContainer"></div>
+      </div>
+      <div class="glass-card">
+        <h3>📊 副作用系统分布</h3>
+        <div class="side-chart"><canvas id="seBarChart"></canvas></div>
+      </div>
+    </div>
+    <div class="bento-grid bento-full" style="margin-top:16px">
+      <div class="glass-card">
+        <h3>⏳ 慢病用药时序与续方触发</h3>
+        <div class="gantt-container" id="ganttContainer">
+          <div style="font-size:13px;color:var(--text-muted)">请先在左侧添加处方信息...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- DECISION FAB -->
+<div class="decision-bar" id="decisionBar">
+  <button class="decision-btn accept" onclick="acceptAIRecommendation()">
+    ✅ 采纳AI方案并下发新处方
+  </button>
+  <button class="decision-btn override" onclick="overrideWarning()">
+    ⚠️ 忽略警告，强制开药
+  </button>
+</div>
+
+</div>
+
+<!-- ==================== JAVASCRIPT ==================== -->
+<script>
+// ==================== STATE ====================
+let simulationResult = null;
+let radarChartInstance = null;
+let seBarChartInstance = null;
+let networkInstance = null;
+let conditions = [];
+let drugs = [];
+
+// ==================== INIT ====================
+document.addEventListener('DOMContentLoaded', () => {
+  checkHealth();
+  autoFillFromEHR();
+  document.getElementById('drugInput').addEventListener('blur', parseDrugs);
+  document.getElementById('drugInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') { e.preventDefault(); parseDrugs(); }
+  });
+  document.getElementById('patConditions').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); generateConditionTags(); }
+  });
+  document.getElementById('patConditions').addEventListener('blur', generateConditionTags);
+});
+
+// ==================== EHR AUTO-FILL ====================
+function autoFillFromEHR() {
+  const ehrData = JSON.parse(localStorage.getItem('pharmsandbox_active_patient')||'null');
+  if (!ehrData) return;
+
+  // Auto-fill patient info
+  document.getElementById('patAge').value = ehrData.age||65;
+  document.getElementById('patGender').value = ehrData.gender||'M';
+  document.getElementById('patConditions').value = (ehrData.conditions||[]).join('\n');
+  document.getElementById('drugInput').value = (ehrData.drugs||[]).join(', ');
+
+  // Auto-fill labs
+  const labs = ehrData.labs||{};
+  if (labs.creatinine) document.getElementById('labCreatinine').value = labs.creatinine;
+  if (labs.alt) document.getElementById('labAlt').value = labs.alt;
+  if (labs.bun) document.getElementById('labBun').value = labs.bun;
+  if (labs.inr) document.getElementById('labInr').value = labs.inr;
+
+  // Generate tags and parse drugs
+  generateConditionTags();
+  parseDrugs().then(() => {
+    // Auto-trigger only after NER parsing completes
+    if (drugs.length >= 2) {
+      setTimeout(() => document.getElementById('btnSimulate').click(), 500);
+    }
+  });
+}
+
+// ==================== HEALTH CHECK ====================
+async function checkHealth() {
+  try {
+    const r = await fetch('/api/health');
+    const d = await r.json();
+    if (d.data_stats) {
+      document.getElementById('pillDrugs').textContent = `💊 ${(d.data_stats.drug_names||0).toLocaleString()}种药`;
+      document.getElementById('pillSE').textContent = `🔬 ${(d.data_stats.side_effects||0).toLocaleString()}副作用`;
+      document.getElementById('pillPatients').textContent = `👥 ${(d.data_stats.patients||0).toLocaleString()}患者`;
+      document.getElementById('pillDrugs').classList.add('good');
+      document.getElementById('pillSE').classList.add('good');
+      document.getElementById('pillPatients').classList.add('good');
+      document.getElementById('pillGNN').textContent = '🧠 数据就绪';
+      document.getElementById('pillGNN').classList.add('good');
+    }
+  } catch(e) {
+    document.getElementById('pillDrugs').textContent = '💊 离线';
+    document.getElementById('pillDrugs').classList.add('warn');
+  }
+}
+
+// ==================== CONDITION TAGS ====================
+function generateConditionTags() {
+  const text = document.getElementById('patConditions').value.trim();
+  if (!text) return;
+  conditions = text.split(/[\n,;，；]+/).map(s => s.trim()).filter(Boolean);
+  renderClickableTags('conditionTags', conditions, 'tag-success', (idx) => {
+    conditions.splice(idx, 1);
+    generateConditionTags();
+    document.getElementById('patConditions').value = conditions.join('\n');
+  });
+}
+
+// ==================== DRUG PARSING (NER) ====================
+async function parseDrugs() {
+  const text = document.getElementById('drugInput').value.trim();
+  if (!text) return;
+  try {
+    const r = await fetch('/api/parse', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text})
+    });
+    const d = await r.json();
+    if (d.drugs && d.drugs.length > 0) {
+      const recognized = new Set(d.drugs.map(dr => typeof dr === 'string' ? dr.toLowerCase() : dr.name?.toLowerCase()));
+      const rawList = text.split(/[,，\s]+/).filter(Boolean);
+      drugs = [];
+      renderDrugTags(rawList.map(name => {
+        const ok = recognized.has(name.toLowerCase());
+        if (ok) drugs.push(name);
+        return {name, recognized: ok};
+      }));
+    } else {
+      const rawList = text.split(/[,，\s]+/).filter(Boolean);
+      drugs = rawList;
+      renderDrugTags(rawList.map(n => ({name:n, recognized:true})));
+    }
+  } catch(e) {
+    const rawList = text.split(/[,，\s]+/).filter(Boolean);
+    drugs = rawList;
+    renderDrugTags(rawList.map(n => ({name:n, recognized:true})));
+  }
+}
+
+function renderDrugTags(drugList) {
+  const container = document.getElementById('drugTags');
+  container.innerHTML = drugList.map((d, i) => `
+    <span class="tag ${d.recognized ? 'tag-success' : 'tag-warning'}">
+      ${d.recognized ? '✓' : '?'} ${d.name}
+      <span class="tag-remove" data-idx="${i}">×</span>
+    </span>
+  `).join('');
+  container.querySelectorAll('.tag-remove').forEach(el => {
+    el.addEventListener('click', () => {
+      drugs.splice(parseInt(el.dataset.idx), 1);
+      document.getElementById('drugInput').value = drugs.join(', ');
+      parseDrugs();
+    });
+  });
+}
+
+function renderClickableTags(containerId, items, className, onRemove) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = items.map((item, i) => `
+    <span class="tag ${className}">${item}
+      <span class="tag-remove" data-idx="${i}">×</span>
+    </span>
+  `).join('');
+  container.querySelectorAll('.tag-remove').forEach(el => {
+    el.addEventListener('click', () => onRemove(parseInt(el.dataset.idx)));
+  });
+}
+
+// ==================== SIMULATION ====================
+async function runSimulation() {
+  if (drugs.length < 2) { showToast('请至少输入 2 种药物', 'error'); return; }
+  showSpinner(true);
+  hideSummary();
+
+  const patient = {
+    age: parseInt(document.getElementById('patAge').value) || 50,
+    gender: document.getElementById('patGender').value,
+    conditions: conditions
+  };
+  const labs = [
+    {id:'labCreatinine', label:'CKD', threshold:130},
+    {id:'labAlt', label:'liver_disease', threshold:80},
+  ];
+  labs.forEach(l => {
+    const val = parseFloat(document.getElementById(l.id).value);
+    if (val && val > l.threshold) patient.conditions.push(l.label);
+  });
+
+  const body = { drugs, patient };
+  if (drugs.length > 0) {
+    body.prescriptions = drugs.map(d => ({
+      drug_name: d, total_quantity: 60, dose_per_time: 1,
+      times_per_day: 2, start_date: '2026-06-01', dose_unit: 'mg'
+    }));
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const r = await fetch('/api/sandbox/simulate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    simulationResult = d;
+    renderAll(d);
+    showDecisionBar();
+  } catch(e) {
+    clearTimeout(timeoutId);
+    if (e.name === 'AbortError') {
+      showToast('服务器推演超时（>15s），请检查后端运行状态', 'error');
+    } else {
+      showToast('推演失败：' + e.message, 'error');
+    }
+  } finally {
+    showSpinner(false);
+  }
+}
+
+function renderAll(data) {
+  const analysis = data.analysis || {};
+  const risk = analysis.risk || {};
+  const level = risk.level || '安全';
+  const score = risk.final_score || 0;
+  const ddiCount = (analysis.ddi?.interactions || []).length;
+
+  // Summary Banner
+  const banner = document.getElementById('summaryBanner');
+  banner.innerHTML = `<strong>推演完成</strong> (${(data.timestamp||'').slice(0,16)})：
+    检测到 <b>${ddiCount}</b> 对药物交互，综合评分 <b>${score} 分</b>。
+    ${score >= 60 ? '建议立即调整处方。' : score >= 40 ? '建议监测用药。' : '当前用药风险可控。'}`;
+  banner.className = 'summary-banner show level-' +
+    (score>=80?'critical':score>=60?'high':score>=40?'medium':score>=20?'low':'safe');
+
+  updateGauge(score, level);
+  // GNN 状态指示
+  const gnnAvail = analysis.ddi?.gnn_available;
+  if (gnnAvail) {
+    document.getElementById('aiBadge').textContent = '🧠 GNN + Rule';
+    document.getElementById('aiBadge').className = 'ai-badge gnn';
+  } else {
+    document.getElementById('aiBadge').textContent = '⚙️ Rule-based';
+    document.getElementById('aiBadge').className = 'ai-badge rule';
+  }
+  updateRadar(analysis);
+  updateAttribution(analysis);
+  updateDDICards(analysis.ddi?.interactions || []);
+  updateAlternatives(analysis.alternatives || []);
+  updateKnowledgeGraph(data.drugs || []);
+  updateSEBarChart(analysis.ddi?.interactions || []);
+  updateGantt(analysis.prescriptions || []);
+}
+
+// ==================== GAUGE ====================
+function updateGauge(score, level) {
+  document.getElementById('gaugeScore').textContent = score;
+  document.getElementById('gaugeScore').style.color =
+    score>=80?'var(--dusty-deep)':score>=60?'var(--sunset-deep)':score>=40?'var(--sunset-deep)':'var(--sage-deep)';
+  document.getElementById('gaugeLevel').textContent = level;
+
+  // Semi-circular gauge: center (110,100) radius 80. Score 0→left, 100→right
+  const theta = Math.PI * (1 - score / 100);
+  const x = 110 + 80 * Math.cos(theta);
+  const y = 100 - 80 * Math.sin(theta);
+  const path = document.getElementById('gaugeFill');
+  path.setAttribute('d', `M 30 100 A 80 80 0 0 1 ${x.toFixed(1)} ${y.toFixed(1)}`);
+  const angle = (score / 100) * 180;
+  document.getElementById('gaugeNeedle').setAttribute('transform', `rotate(${-90 + angle} 110 100)`);
+}
+
+// ==================== RADAR ====================
+function updateRadar(analysis) {
+  const ctx = document.getElementById('radarChart').getContext('2d');
+  if (radarChartInstance) radarChartInstance.destroy();
+
+  const risk = analysis.risk || {};
+  const ddiInteractions = (analysis.ddi?.interactions || []).length;
+  const s = risk.final_score || 0;
+
+  // 从 individual_risks 中聚合各器官系统的真实风险
+  const organAgg = {renal:0, hepatic:0, cardiac:0, hematologic:0, respiratory:0, neurologic:0};
+  const drugRisks = risk.individual_risks || [];
+  drugRisks.forEach(dr => {
+    const organs = dr.organ_risks || {};
+    for (const [organ, val] of Object.entries(organs)) {
+      organAgg[organ] = Math.max(organAgg[organ] || 0, val || 0);
+    }
+  });
+
+  const dims = [
+    Math.min(100, ddiInteractions * 20 + s * 0.1),
+    Math.min(100, organAgg.renal || s * 0.3),
+    Math.min(100, organAgg.hepatic || s * 0.3),
+    Math.min(100, organAgg.cardiac || s * 0.2),
+    Math.min(100, organAgg.hematologic || s * 0.2),
+    Math.min(100, organAgg.neurologic || s * 0.15),
+  ];
+
+  const maxDim = Math.max(...dims, 1);
+  radarChartInstance = new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels: ['DDI冲突', '肾毒性', '肝毒性', '心血管风险', '出血风险', '代谢风险'],
+      datasets: [{
+        data: dims,
+        backgroundColor: maxDim > 60 ? 'rgba(196,168,162,0.35)' : maxDim > 40 ? 'rgba(232,185,141,0.35)' : 'rgba(181,196,177,0.35)',
+        borderColor: maxDim > 60 ? '#C4A8A2' : maxDim > 40 ? '#E8B98D' : '#B5C4B1',
+        borderWidth: 2, pointBackgroundColor: '#9CAEBF', pointBorderColor: '#fff', pointRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 20, display: false } } },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+// ==================== ATTRIBUTION ====================
+function updateAttribution(analysis) {
+  const panel = document.getElementById('attributionPanel');
+  const drugRisks = analysis.risk?.individual_risks || [];
+  if (drugRisks.length === 0) {
+    panel.innerHTML = '<span style="color:var(--text-muted)">无详细归因数据</span>';
+    return;
+  }
+  panel.innerHTML = drugRisks.map(dr => {
+    const organRisks = dr.organ_risks || {};
+    const topOrgan = dr.top_risk_organ || 'general';
+    return `
+    <div style="margin-bottom:10px;padding:8px;background:rgba(0,0,0,0.02);border-radius:8px">
+      <b>${dr.drug_cid}</b>
+      <span style="float:right;font-weight:700;color:${dr.score>=60?'var(--dusty-deep)':dr.score>=40?'var(--sunset-deep)':'var(--sage-deep)'}">${dr.score.toFixed(1)}分</span>
+      <div style="font-size:12px;color:var(--text-secondary)">
+        副作用计数: ${dr.side_effect_count} | 风险等级: ${dr.level}
+        <br>主要器官系统: ${topOrgan} (${(organRisks[topOrgan]||0).toFixed(1)}分)
+      </div>
+    </div>
+  `}).join('');
+}
+
+// ==================== DDI CARDS ====================
+function updateDDICards(interactions) {
+  const container = document.getElementById('ddiList');
+  if (interactions.length === 0) {
+    container.innerHTML = '<div style="color:var(--sage-deep);text-align:center;padding:20px">✓ 未检测到药物相互作用，当前组合安全</div>';
+    return;
+  }
+  const order = {high:0, moderate:1, mild:2};
+  interactions.sort((a,b) => (order[a.severity]||2) - (order[b.severity]||2));
+
+  container.innerHTML = interactions.map((ddi, i) => `
+    <div class="ddi-card severity-${ddi.severity||'mild'}" id="ddi${i}">
+      <div class="ddi-card-header">
+        <span class="ddi-drugs">${ddi.drug1} ⚡ ${ddi.drug2}</span>
+        <span style="display:flex;align-items:center;gap:8px">
+          <span class="ddi-se-count">${ddi.common_se_count||0} 共同副作用</span>
+          <span class="ddi-confidence">${ddi.severity==='high'?'高危':ddi.severity==='moderate'?'中危':'轻微'}</span>
+        </span>
+      </div>
+      <div class="ddi-effects">
+        ${(ddi.top_effects||ddi.common_effects||[]).slice(0,8).map(se => `<span class="ddi-effect-tag">${se}</span>`).join('')}
+      </div>
+      ${ddi.explanation ? `
+      <button class="ddi-toggle-btn" onclick="toggleExplain(${i})">💡 探索深层药理机制 ▾</button>
+      <div class="ddi-explain" id="ddiExplain${i}">
+        ${ddi.explanation.clinical_effect ? `<div><b>临床效应：</b>${ddi.explanation.clinical_effect}</div>` : ''}
+        ${ddi.explanation.mechanism ? `<div style="margin-top:6px"><b>药理机制：</b>${ddi.explanation.mechanism}</div>` : ''}
+        ${ddi.explanation.recommendation ? `<div style="margin-top:6px"><b>建议：</b>${ddi.explanation.recommendation}</div>` : ''}
+      </div>
+      ` : ''}
+    </div>
+  `).join('');
+}
+
+function toggleExplain(idx) {
+  const el = document.getElementById('ddiExplain'+idx);
+  if (el) el.classList.toggle('show');
+}
+
+// ==================== ALTERNATIVES ====================
+function updateAlternatives(alternatives) {
+  const container = document.getElementById('altContainer');
+  const filtered = (alternatives||[]).filter(a => a.alternatives && a.alternatives.length > 0);
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="color:var(--sage-deep);text-align:center;padding:30px">🌿 当前药物组合风险可控，无需替代方案</div>';
+    return;
+  }
+  container.innerHTML = filtered.map(alt => {
+    const candidates = alt.alternatives || [];
+    return `
+    <div style="margin-bottom:20px">
+      <h4 style="color:var(--dusty-deep);margin-bottom:12px">${alt.original} → 替代候选</h4>
+      <div class="alt-comparison">
+        <div class="alt-original">
+          <div style="font-weight:600;color:var(--dusty-deep)">原药</div>
+          <div style="font-size:16px;margin-top:6px">${alt.original}</div>
+        </div>
+        ${candidates.map(c => `
+        <div class="alt-candidate" style="flex:1">
+          <div class="alt-score-circle ${c.score>=80?'high':'mid'}">${c.score||0}%</div>
+          <div style="text-align:center;font-weight:600">${c.name||c.drug_name}</div>
+          <div style="text-align:center;font-size:11px;color:var(--text-muted)">${c.atc_code||''}</div>
+          <ul class="alt-reasons">${(c.reasons||[]).map(r=>`<li>${r}</li>`).join('')}</ul>
+          <button class="alt-explain-btn" onclick="showExplain('${alt.original}','${c.name||c.drug_name}')">🔍 为什么推荐？</button>
+        </div>
+        `).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function showExplain(original, alternative) {
+  try {
+    const r = await fetch('/api/recommend/explain', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({original_drug:original, alternative})
+    });
+    const d = await r.json();
+    document.getElementById('explainCompare').innerHTML = `
+      <div>
+        <b>${d.original_drug}</b> (ATC: ${d.atc_original||'N/A'})
+        <p class="explain-keep">✅ 共同适应症：${(d.shared_indications||[]).join('、')||'无'}</p>
+        <p class="explain-drop">🚫 独有副作用：${(d.unique_side_effects_original||[]).slice(0,5).join('、')||'无'}</p>
+      </div>
+      <div>
+        <b>${d.alternative}</b> (ATC: ${d.atc_alternative||'N/A'})
+        <p class="explain-keep">✅ 共同适应症：${(d.shared_indications||[]).join('、')||'无'}</p>
+        <p class="explain-keep">✅ 独有副作用：${(d.unique_side_effects_alternative||[]).slice(0,5).join('、')||'无'}</p>
+      </div>
+    `;
+    document.getElementById('explainOverlay').classList.add('show');
+  } catch(e) {
+    showToast('获取解释失败', 'error');
+  }
+}
+
+// ==================== KNOWLEDGE GRAPH ====================
+function updateKnowledgeGraph(drugList) {
+  const container = document.getElementById('graphContainer');
+  if (!drugList || drugList.length === 0) {
+    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted)">等待药物数据...</div>';
+    return;
+  }
+  const nodes = []; const edges = []; const seMap = new Map();
+  const interactions = (simulationResult?.analysis?.ddi?.interactions) || [];
+
+  drugList.forEach((d, i) => {
+    nodes.push({id:`drug_${i}`, label:d, color:{background:'#9CAEBF',border:'#738A9F'}, font:{color:'#4A4543'}, shape:'dot', size:20});
+  });
+
+  interactions.forEach(ddi => {
+    const i1 = drugList.indexOf(ddi.drug1), i2 = drugList.indexOf(ddi.drug2);
+    if (i1 >= 0 && i2 >= 0) {
+      edges.push({from:`drug_${i1}`, to:`drug_${i2}`, color:{color:'#C4A8A2'}, dashes:true, title:`${ddi.common_se_count||0} common SE`});
+    }
+    (ddi.top_effects||ddi.common_effects||[]).forEach(se => {
+      if (!seMap.has(se)) {
+        seMap.set(se, nodes.length);
+        nodes.push({id:`se_${nodes.length}`, label:se, color:{background:'#E8B98D',border:'#D4955C'}, font:{color:'#4A4543',size:10}, shape:'dot', size:8});
+      }
+      if (i1 >= 0) edges.push({from:`drug_${i1}`, to:`se_${seMap.get(se)}`, color:{color:'#D5CEC8'}, width:0.5});
+    });
+  });
+
+  if (networkInstance) networkInstance.destroy();
+  networkInstance = new vis.Network(container, {nodes:new vis.DataSet(nodes), edges:new vis.DataSet(edges)}, {
+    physics:{solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-40,centralGravity:0.005}},
+    interaction:{hover:true,zoomView:true,dragView:true},
+    nodes:{borderWidth:2},
+  });
+}
+
+// ==================== SE BAR CHART ====================
+function updateSEBarChart(interactions) {
+  const ctx = document.getElementById('seBarChart').getContext('2d');
+  if (seBarChartInstance) seBarChartInstance.destroy();
+
+  const cats = {'出血':0,'胃肠道':0,'神经':0,'皮肤':0,'肝毒性':0,'肾毒性':0,'心血管':0,'呼吸':0,'其他':0};
+  const kw = {
+    '出血':/bleed|hemorrhag|出血|凝血|bruis/i,
+    '胃肠道':/nausea|vomit|diarrh|constip|abdominal|gastro/i,
+    '神经':/headache|dizz|confus|seizure|insomni|anxi|depress/i,
+    '皮肤':/rash|prurit|urticar|photo/i,
+    '肝毒性':/hepat|肝|liver/i,
+    '肾毒性':/renal|kidney|nephro|肾/i,
+    '心血管':/tachy|hypotension|hypertension|cardia|chest|palpit/i,
+    '呼吸':/cough|dyspn|broncho|pneum/i,
+  };
+  interactions.forEach(ddi => {
+    (ddi.top_effects||ddi.common_effects||[]).forEach(se => {
+      let matched = false;
+      for (const [cat, re] of Object.entries(kw)) {
+        if (re.test(se)) { cats[cat]++; matched = true; break; }
+      }
+      if (!matched) cats['其他']++;
+    });
+  });
+
+  seBarChartInstance = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels:Object.keys(cats),
+      datasets:[{
+        data:Object.values(cats),
+        backgroundColor:['#C4A8A2','#E8B98D','#B5C4B1','#9CAEBF','#D4B896','#B8A9A0','#A8B8C8','#C8C0B8','#D5CEC8'],
+        borderWidth:0, borderRadius:6,
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      indexAxis:'y',
+      plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false}},y:{grid:{display:false}}}
+    }
+  });
+}
+
+// ==================== GANTT + REFILL ====================
+function updateGantt(prescriptions) {
+  const container = document.getElementById('ganttContainer');
+  if (!prescriptions || prescriptions.length === 0) {
+    container.innerHTML = '<div style="font-size:13px;color:var(--text-muted);text-align:center;padding:20px">请在左侧输入区添加处方信息以查看用药时序</div>';
+    return;
+  }
+  const alertDays = parseInt(document.getElementById('refillDays').value) || 3;
+  container.innerHTML = prescriptions.map(rx => {
+    const remainingDays = rx.remaining_days || 0;
+    const totalDays = Math.max(remainingDays + 10, 30);
+    const usedPct = Math.max(0, Math.min(100, ((totalDays - remainingDays) / totalDays) * 100));
+    const remainingPct = Math.max(0, (remainingDays / totalDays) * 100);
+    const needsRefill = remainingDays <= alertDays;
+    const expired = remainingDays <= 0;
+    return `
+    <div class="gantt-row">
+      <div class="gantt-label">${rx.drug_name||'Unknown'}</div>
+      <div class="gantt-track">
+        <div class="gantt-bar ${expired?'expired':'used'}" style="width:${usedPct}%;left:0"></div>
+        <div class="gantt-bar remaining" style="width:${remainingPct}%;left:${usedPct}%"></div>
+        <div class="gantt-marker" style="left:${usedPct}%"></div>
+      </div>
+      <span style="font-size:12px;color:${expired?'var(--dusty-deep)':needsRefill?'var(--sunset-deep)':'var(--sage-deep)'};width:80px">
+        ${expired?'已用完':`剩${remainingDays}天`}
+      </span>
+      ${needsRefill ? `<button class="gantt-refill-btn" onclick="showRefillDraft('${rx.drug_name||'Unknown'}')">续方</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function showRefillDraft(drugName) {
+  try {
+    const patient = {
+      patient_id:'P001', name:'患者',
+      age:parseInt(document.getElementById('patAge').value)||65,
+      gender:document.getElementById('patGender').value
+    };
+    const r = await fetch('/api/prescription/refill-draft', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        prescription:{drug_name:drugName, total_quantity:60, dose_per_time:1, times_per_day:2, start_date:'2026-06-01', dose_unit:'mg'},
+        patient
+      })
+    });
+    const d = await r.json();
+    document.getElementById('refillDraft').textContent = JSON.stringify(d, null, 2);
+    document.getElementById('refillModal').classList.add('show');
+  } catch(e) {
+    showToast('生成续方草稿失败', 'error');
+  }
+}
+
+// ==================== TABS ====================
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.tab-btn[onclick*="${name}"]`)?.classList.add('active');
+  document.getElementById('tab-'+name)?.classList.add('active');
+  if (name === 'graph' && simulationResult) {
+    setTimeout(() => updateKnowledgeGraph(simulationResult.drugs||[]), 100);
+  }
+}
+
+// ==================== UTILITIES ====================
+function showSpinner(show) {
+  document.getElementById('spinner').classList.toggle('show', show);
+  document.getElementById('btnSimulate').disabled = show;
+}
+function hideSummary() { document.getElementById('summaryBanner').classList.remove('show'); }
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show ' + type;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ==================== DECISION BUTTONS ====================
+function showDecisionBar() {
+  const bar = document.getElementById('decisionBar');
+  if (simulationResult) bar.classList.add('show');
+  else bar.classList.remove('show');
+}
+
+function acceptAIRecommendation() {
+  const ehrData = JSON.parse(localStorage.getItem('pharmsandbox_active_patient')||'{}');
+  const patientId = ehrData.id || 'unknown';
+  // Mark as processed in localStorage
+  let processed = JSON.parse(localStorage.getItem('pharmsandbox_processed')||'[]');
+  if (!processed.includes(patientId)) processed.push(patientId);
+  localStorage.setItem('pharmsandbox_processed', JSON.stringify(processed));
+
+  // Notify patient window
+  localStorage.setItem('pharmsandbox_doctor_action', JSON.stringify({
+    patientId, action:'new_prescription', message:'医生已采纳AI建议，新处方已下发',
+    time: new Date().toISOString()
+  }));
+
+  showToast('✅ 新处方已下发！患者状态已更新', 'success');
+  setTimeout(() => {
+    if (window.opener) {
+      window.opener.postMessage({type:'prescription_sent',patientId}, '*');
+      window.close();
+    }
+  }, 1500);
+}
+
+function overrideWarning() {
+  const ehrData = JSON.parse(localStorage.getItem('pharmsandbox_active_patient')||'{}');
+  const patientId = ehrData.id || 'unknown';
+  let processed = JSON.parse(localStorage.getItem('pharmsandbox_processed')||'[]');
+  if (!processed.includes(patientId)) processed.push(patientId);
+  localStorage.setItem('pharmsandbox_processed', JSON.stringify(processed));
+  showToast('已记录：医生知晓风险并强制开药', 'info');
+  setTimeout(() => { if (window.opener) window.close(); }, 1500);
+}
+
+// ==================== LAB REFRESH (IoT SIMULATION) ====================
+async function refreshLabValues() {
+  const ehrData = JSON.parse(localStorage.getItem('pharmsandbox_active_patient')||'{}');
+  const labs = ehrData.labs || {
+    creatinine: parseFloat(document.getElementById('labCreatinine').value)||100,
+    alt: parseFloat(document.getElementById('labAlt').value)||30,
+    bun: parseFloat(document.getElementById('labBun').value)||8,
+    inr: parseFloat(document.getElementById('labInr').value)||1
+  };
+  try {
+    const r = await fetch('/api/ehr/lab_refresh', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({labs})
+    });
+    const d = await r.json();
+    const refreshed = d.refreshed;
+    // Update input fields
+    if (refreshed.creatinine) document.getElementById('labCreatinine').value = refreshed.creatinine;
+    if (refreshed.alt) document.getElementById('labAlt').value = refreshed.alt;
+    if (refreshed.bun) document.getElementById('labBun').value = refreshed.bun;
+    if (refreshed.inr) document.getElementById('labInr').value = refreshed.inr;
+    // Flash animation
+    if (d.spike && d.spike_key) {
+      document.getElementById('lab'+d.spike_key.charAt(0).toUpperCase()+d.spike_key.slice(1))
+        ?.parentElement?.classList.add('lab-spike');
+    }
+    // Auto re-run simulation
+    if (d.spike) setTimeout(() => document.getElementById('btnSimulate').click(), 500);
+    showToast(d.message, d.spike ? 'info' : 'success');
+  } catch(e) {
+    showToast('化验刷新失败', 'error');
+  }
+}
+
+function resetAll() {
+  simulationResult = null; conditions = []; drugs = [];
+  document.getElementById('patConditions').value = '';
+  document.getElementById('drugInput').value = '';
+  document.getElementById('conditionTags').innerHTML = '';
+  document.getElementById('drugTags').innerHTML = '';
+  document.getElementById('gaugeScore').textContent = '--';
+  document.getElementById('gaugeLevel').textContent = '等待推演';
+  document.getElementById('attributionPanel').innerHTML = '等待推演...';
+  document.getElementById('ddiList').innerHTML = '<div style="font-size:13px;color:var(--text-muted)">等待推演...</div>';
+  document.getElementById('altContainer').innerHTML = '等待推演...';
+  document.getElementById('ganttContainer').innerHTML = '<div style="font-size:13px;color:var(--text-muted)">请先在左侧添加处方信息...</div>';
+  document.getElementById('graphContainer').innerHTML = '';
+  document.getElementById('summaryBanner').classList.remove('show');
+  if (radarChartInstance) radarChartInstance.destroy();
+  if (seBarChartInstance) seBarChartInstance.destroy();
+  if (networkInstance) networkInstance.destroy();
+  document.getElementById('aiBadge').textContent = '⚙️ Rule-based';
+  document.getElementById('aiBadge').className = 'ai-badge rule';
+  showToast('沙盘已重置', 'success');
+}
+
+// ==================== PRESETS ====================
+function loadPreset(type) {
+  resetAll();
+  const presets = {
+    elderly: {age:72, gender:'M', conditions:'糖尿病\nCKD 3期\n高血压\n骨关节炎', drugs:'aspirin, metformin, lisinopril, ibuprofen'},
+    surgery: {age:55, gender:'F', conditions:'心房颤动\n术后抗凝', drugs:'warfarin, heparin, ibuprofen'},
+    cardio:  {age:68, gender:'M', conditions:'高血压\n高脂血症\n心力衰竭', drugs:'lisinopril, atorvastatin, carvedilol, furosemide'},
+  };
+  const p = presets[type];
+  if (!p) return;
+  document.getElementById('patAge').value = p.age;
+  document.getElementById('patGender').value = p.gender;
+  document.getElementById('patConditions').value = p.conditions;
+  document.getElementById('drugInput').value = p.drugs;
+  generateConditionTags();
+  parseDrugs();
+  showToast('已加载快捷处方：' + type, 'success');
+}
+</script>
+</body>
+</html>

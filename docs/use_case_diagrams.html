@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PharmSandbox 药盘推演 — 系统用例图 (PlantUML)</title>
+<script src="https://cdn.jsdelivr.net/npm/pako@2/dist/pako.min.js"></script>
+<style>
+  :root {
+    --bg: #f0f4f3;
+    --card-bg: #ffffff;
+    --primary: #0d7377;
+    --primary-light: #14a3a8;
+    --accent: #2563eb;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+    --shadow: 0 1px 3px rgba(0,0,0,.08);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,.1);
+    --radius: 12px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Microsoft YaHei", "Helvetica Neue", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, #0a4c4f 0%, #0d7377 40%, #14a3a8 100%);
+    color: #fff;
+    padding: 32px 40px 28px;
+    text-align: center;
+  }
+  .header h1 { font-size: 2rem; font-weight: 700; letter-spacing: .02em; }
+  .header .subtitle { margin-top: 6px; font-size: .95rem; opacity: .85; }
+  .header .badges { margin-top: 14px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .header .badge {
+    background: rgba(255,255,255,.15);
+    backdrop-filter: blur(4px);
+    padding: 4px 14px; border-radius: 20px;
+    font-size: .82rem;
+  }
+
+  /* ── Tabs ── */
+  .tab-bar {
+    display: flex; justify-content: center; gap: 4px;
+    padding: 18px 20px 0;
+    background: var(--bg);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .tab-btn {
+    padding: 10px 28px;
+    border: 2px solid transparent;
+    background: transparent;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: .95rem; font-weight: 500;
+    color: var(--text-muted);
+    transition: all .2s;
+  }
+  .tab-btn:hover { color: var(--text); background: rgba(0,0,0,.04); }
+  .tab-btn.active {
+    background: #fff; color: var(--primary);
+    border-color: var(--primary-light); box-shadow: var(--shadow);
+  }
+
+  /* ── Main ── */
+  .main { max-width: 1200px; margin: 0 auto; padding: 24px 20px 60px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── Card ── */
+  .card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 28px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 600; font-size: 1.02rem;
+  }
+  .card-body { padding: 28px; text-align: center; }
+
+  /* ── Diagram image ── */
+  .diagram-img {
+    max-width: 100%; height: auto;
+    border-radius: 6px;
+    background: #fff;
+  }
+  .diagram-wrap {
+    display: inline-block;
+    max-width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    background: #fafbfc;
+  }
+  .diagram-wrap.loading {
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: .9rem;
+  }
+  .spinner {
+    display: inline-block; width: 20px; height: 20px;
+    border: 2px solid #e2e8f0;
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Two column ── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+  }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    padding: 10px 0 0;
+    font-size: .84rem; color: var(--text-muted);
+    justify-content: center;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-line {
+    width: 28px; height: 0;
+    border-top: 2px solid #475569;
+  }
+  .legend-line.dashed { border-top-style: dashed; }
+
+  /* ── Summary cards ── */
+  .summary-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px; margin-bottom: 28px;
+  }
+  @media (max-width: 768px) { .summary-row { grid-template-columns: repeat(2, 1fr); } }
+  .summary-card {
+    background: #fff; border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 18px 20px; text-align: center;
+  }
+  .summary-card .num { font-size: 2rem; font-weight: 700; color: var(--primary); }
+  .summary-card .label { font-size: .82rem; color: var(--text-muted); margin-top: 2px; }
+
+  /* ── Description table ── */
+  .desc-table {
+    width: 100%; border-collapse: collapse; font-size: .88rem; text-align: left;
+  }
+  .desc-table th {
+    background: #f1f5f9; padding: 10px 14px;
+    font-weight: 600; color: var(--text);
+  }
+  .desc-table td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .desc-table tr:hover td { background: #f8fafc; }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center; padding: 20px;
+    color: var(--text-muted); font-size: .8rem;
+  }
+
+  /* ── Error ── */
+  .diagram-error {
+    color: #dc2626; font-size: .85rem;
+    padding: 20px; text-align: center;
+  }
+  .diagram-error pre {
+    text-align: left; background: #fef2f2;
+    padding: 12px; border-radius: 6px;
+    overflow-x: auto; font-size: .78rem;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════ HEADER ═══════ -->
+<div class="header">
+  <h1>PharmSandbox 药盘推演</h1>
+  <p class="subtitle">基于图神经网络的药物相互作用沙盘推演系统 — UML 用例图</p>
+  <div class="badges">
+    <span class="badge">需求规格 v1.0</span>
+    <span class="badge">医生工作台</span>
+    <span class="badge">患者移动端</span>
+    <span class="badge">GNN 决策引擎</span>
+  </div>
+</div>
+
+<!-- ═══════ TABS ═══════ -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('overview')"> 系统总用例图</button>
+  <button class="tab-btn" onclick="switchTab('doctor')"> 医生端详细用例</button>
+  <button class="tab-btn" onclick="switchTab('patient')"> 患者端详细用例</button>
+  <button class="tab-btn" onclick="switchTab('pharmacist')"> 药师端用例</button>
+</div>
+
+<!-- ═══════ MAIN ═══════ -->
+<div class="main">
+
+<!-- Summary -->
+<div class="summary-row">
+  <div class="summary-card"><div class="num">3</div><div class="label">参与者 (Actor)</div></div>
+  <div class="summary-card"><div class="num">22+</div><div class="label">用例 (Use Case)</div></div>
+  <div class="summary-card"><div class="num">12</div><div class="label">API 端点</div></div>
+  <div class="summary-card"><div class="num">4</div><div class="label">系统层级</div></div>
+</div>
+
+<!-- ═══════ TAB 1: 系统总用例图 ═══════ -->
+<div id="tab-overview" class="tab-panel active">
+
+<div class="card">
+  <div class="card-header"> 系统总用例图 — PharmSandbox 全局视图</div>
+  <div class="card-body">
+    <div class="diagram-wrap loading" id="diagram-overview">
+      <span class="spinner"></span>正在渲染 PlantUML...
+    </div>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-line"></span> 关联 Association</div>
+      <div class="legend-item"><span class="legend-line dashed"></span> 包含/扩展 &lt;&lt;include&gt;&gt; / &lt;&lt;extend&gt;&gt;</div>
+    </div>
+    <p style="margin-top:12px;font-size:.84rem;color:var(--text-muted);">
+      图 1 — 系统级上下文视图：3 位参与者与 3 个子系统的用例关系
+    </p>
+  </div>
+</div>
+
+</div><!-- /tab-overview -->
+
+<!-- ═══════ TAB 2: 医生端 ═══════ -->
+<div id="tab-doctor" class="tab-panel">
+
+<div class="card">
+  <div class="card-header"> 医生端核心用例图 — 沙盘推演 + 处方决策</div>
+  <div class="card-body">
+    <div class="diagram-wrap loading" id="diagram-doctor">
+      <span class="spinner"></span>正在渲染 PlantUML...
+    </div>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-line"></span> 关联</div>
+      <div class="legend-item"><span class="legend-line dashed"></span> &lt;&lt;include&gt;&gt; 强制依赖</div>
+      <div class="legend-item"><span class="legend-line dashed"></span> &lt;&lt;extend&gt;&gt; 条件扩展</div>
+    </div>
+    <p style="margin-top:12px;font-size:.84rem;color:var(--text-muted);">
+      图 2 — 医生端完整用例：从患者队列 → 沙盘推演 → DDI三层检测 → 风险评分 → 替代推荐 → 处方决策
+    </p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"> 医生端业务活动图 — 从登录到处方决策</div>
+  <div class="card-body">
+    <div class="diagram-wrap loading" id="diagram-doctor-activity">
+      <span class="spinner"></span>正在渲染 PlantUML...
+    </div>
+    <p style="margin-top:12px;font-size:.84rem;color:var(--text-muted);">
+      图 3 — 医生端完整业务流程：登录→队列→推演→DDI检测→风险评分→替代推荐→续方→决策
+    </p>
+  </div>
+</div>
+
+</div><!-- /tab-doctor -->
+
+<!-- ═══════ TAB 3: 患者端 ═══════ -->
+<div id="tab-patient" class="tab-panel">
+
+<div class="card">
+  <div class="card-header"> 患者端用例图 — 移动端用药安全与医患联动</div>
+  <div class="card-body">
+    <div class="diagram-wrap loading" id="diagram-patient">
+      <span class="spinner"></span>正在渲染 PlantUML...
+    </div>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-line"></span> 关联</div>
+      <div class="legend-item"><span class="legend-line dashed"></span> &lt;&lt;include&gt;&gt; / &lt;&lt;extend&gt;&gt;</div>
+    </div>
+    <p style="margin-top:12px;font-size:.84rem;color:var(--text-muted);">
+      图 4 — 患者端用例：用药提醒、症状反馈(4步剧本)、续方申请、处方更新接收
+    </p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"> 医患联动序列图 — localStorage 跨窗口通信</div>
+  <div class="card-body">
+    <div class="diagram-wrap loading" id="diagram-sequence">
+      <span class="spinner"></span>正在渲染 PlantUML...
+    </div>
+    <p style="margin-top:12px;font-size:.84rem;color:var(--text-muted);">
+      图 5 — 患者上报症状 → localStorage → 医生工作站提醒 → 医生处理 → 处方推回患者端
+    </p>
+  </div>
+</div>
+
+</div><!-- /tab-patient -->
+
+<!-- ═══════ TAB 4: 药师端 ═══════ -->
+<div id="tab-pharmacist" class="tab-panel">
+
+<div class="card">
+  <div class="card-header"> 药师端用例图 — 处方审核与替代评估</div>
+  <div class="card-body">
+    <div class="diagram-wrap loading" id="diagram-pharmacist">
+      <span class="spinner"></span>正在渲染 PlantUML...
+    </div>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-line"></span> 关联</div>
+      <div class="legend-item"><span class="legend-line dashed"></span> &lt;&lt;include&gt;&gt;</div>
+    </div>
+    <p style="margin-top:12px;font-size:.84rem;color:var(--text-muted);">
+      图 6 — 药师审核流程：查看待审核处方 → DDI分析 → 替代方案评估 → 生成报告 → 批注
+    </p>
+  </div>
+</div>
+
+</div><!-- /tab-pharmacist -->
+
+<!-- Legend card -->
+<div class="card">
+  <div class="card-header"> 用例图关系说明</div>
+  <div class="card-body" style="overflow-x:auto;">
+    <table class="desc-table">
+      <thead>
+        <tr><th>关系类型</th><th>PlantUML表示</th><th>语义</th><th>示例</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>关联 Association</strong></td>
+          <td>Actor ⸻ UseCase</td>
+          <td>参与者与用例之间的通信</td>
+          <td>医生 → 查看待诊队列</td>
+        </tr>
+        <tr>
+          <td><strong>包含 &lt;&lt;include&gt;&gt;</strong></td>
+          <td>Base ····> Included</td>
+          <td>基用例必然调用被包含用例（强制依赖）</td>
+          <td>沙盘推演 → DDI冲突检测</td>
+        </tr>
+        <tr>
+          <td><strong>扩展 &lt;&lt;extend&gt;&gt;</strong></td>
+          <td>Base &lt;···· Extending</td>
+          <td>基用例在特定条件下可选调用扩展用例</td>
+          <td>DDI检测 &lt;···· GNN预测 (GNN可用时)</td>
+        </tr>
+        <tr>
+          <td><strong>泛化 Generalization</strong></td>
+          <td>Child ⸺▷ Parent</td>
+          <td>参与者/用例间的继承关系</td>
+          <td>医生、药师 → 医疗机构用户</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<div class="footer">
+  PharmSandbox 药盘推演 — 需求规格说明书配套用例图 &nbsp;|&nbsp; v1.0 &nbsp;|&nbsp; 2026年7月 &nbsp;|&nbsp; 重庆大学
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  PlantUML 源文件定义
+// ═══════════════════════════════════════════
+
+const DIAGRAMS = {
+
+  // ── 图1: 系统总用例图 ──
+  overview: `@startuml
+' ===== 系统总用例图 =====
+left to right direction
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam actorBackgroundColor #DBEAFE
+skinparam actorBorderColor #2563EB
+skinparam usecaseBackgroundColor #FFFFFF
+skinparam usecaseBorderColor #0D7377
+skinparam packageBorderColor #0D7377
+skinparam packageBackgroundColor #F0FDFA
+skinparam packageFontColor #0D7377
+skinparam packageFontSize 15
+skinparam packageFontStyle bold
+skinparam defaultFontSize 13
+
+actor "临床医生" as Doctor <<医疗机构用户>>
+actor "临床药师" as Pharmacist <<医疗机构用户>>
+actor "患者" as Patient
+
+rectangle "PharmSandbox 药盘推演系统" {
+
+  package "医生工作台子系统" {
+    usecase "查看待诊患者队列" as UC_Queue
+    usecase "查看EHR详情" as UC_EHR
+    usecase "化验指标刷新" as UC_Lab
+  }
+
+  package "沙盘推演核心子系统" {
+    usecase "DDI冲突检测" as UC_DDI
+    usecase "风险量化评分" as UC_Risk
+    usecase "替代药物推荐" as UC_Alt
+    usecase "LLM药理机制解释" as UC_LLM
+    usecase "慢病续方检查" as UC_Refill
+    usecase "知识图谱可视化" as UC_KG
+  }
+
+  package "患者移动端子系统" {
+    usecase "用药安全提醒" as UC_Remind
+    usecase "续方进度可视化" as UC_Progress
+    usecase "身体状况反馈" as UC_Symptom
+    usecase "接收处方更新" as UC_RxUpdate
+  }
+}
+
+Doctor --> UC_Queue
+Doctor --> UC_EHR
+Doctor --> UC_DDI
+Doctor --> UC_Risk
+Doctor --> UC_Alt
+Doctor --> UC_LLM
+Doctor --> UC_Refill
+Doctor --> UC_KG
+
+Pharmacist --> UC_Queue
+Pharmacist --> UC_DDI
+Pharmacist --> UC_Risk
+Pharmacist --> UC_Alt
+Pharmacist --> UC_LLM
+
+Patient --> UC_Remind
+Patient --> UC_Progress
+Patient --> UC_Symptom
+Patient --> UC_RxUpdate
+Patient --> UC_Refill
+
+UC_Queue ..> UC_EHR : <<include>>
+UC_Queue ..> UC_Lab : <<include>>
+UC_DDI ..> UC_LLM : <<include>>
+UC_Risk ..> UC_Alt : <<extend>>
+UC_Refill ..> UC_RxUpdate : <<notify>>
+
+note right of UC_DDI
+  三层检测架构:
+  GNN预测 + SIDER规则
+  + LLM知识库仲裁
+end note
+
+@enduml`,
+
+  // ── 图2: 医生端详细用例图 ──
+  doctor: `@startuml
+' ===== 医生端核心用例图 =====
+left to right direction
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam actorBackgroundColor #DBEAFE
+skinparam actorBorderColor #2563EB
+skinparam actorFontSize 14
+skinparam actorFontStyle bold
+skinparam usecaseBackgroundColor #FFFFFF
+skinparam usecaseBorderColor #2563EB
+skinparam usecaseFontSize 12
+skinparam packageBorderColor #3B82F6
+skinparam packageBackgroundColor #EFF6FF
+skinparam defaultFontSize 12
+
+actor "临床医生" as Doctor
+
+rectangle "医生工作台 + 沙盘推演子系统" {
+
+  package "患者管理" {
+    usecase "查看待诊患者队列" as UC_Queue
+    usecase "查看患者EHR详情" as UC_EHR
+    usecase "物联网化验指标刷新" as UC_Lab
+    usecase "三级状态标签识别\\n(高危/续方/常规)" as UC_Status
+  }
+
+  package "沙盘推演核心" {
+    usecase "NER药物实体识别" as UC_NER
+    usecase "开始沙盘推演" as UC_Sim
+    usecase "DDI冲突检测\\n(三层检测)" as UC_DDI
+    usecase "GNN模型预测\\n(RGCN前向传播)" as UC_GNN
+    usecase "副作用交集比对\\n(SIDER规则引擎)" as UC_Rule
+    usecase "LLM知识库仲裁\\n(严重度判定)" as UC_LLM
+    usecase "风险量化评分\\n(0-100分)" as UC_Risk
+    usecase "六维风险雷达图" as UC_Radar
+    usecase "归因剖析面板" as UC_Attrib
+    usecase "替代药物推荐\\n(ATC分类+适应症匹配)" as UC_Alt
+    usecase "推荐因果解释" as UC_Explain
+    usecase "慢病续方检查" as UC_Refill
+    usecase "结构化续方草稿" as UC_Draft
+    usecase "知识图谱可视化" as UC_KG
+  }
+
+  package "处方决策" {
+    usecase "采纳AI方案\\n下发新处方" as UC_Adopt
+    usecase "忽略警告\\n强制开药" as UC_Override
+    usecase "标记已处理" as UC_Done
+  }
+}
+
+' ── 关联 ──
+Doctor --> UC_Queue
+Doctor --> UC_Sim
+
+' ── 患者管理 include ──
+UC_Queue ..> UC_EHR : <<include>>
+UC_Queue ..> UC_Status : <<include>>
+UC_EHR ..> UC_Lab : <<include>>
+
+' ── 沙盘推演 include ──
+UC_Sim ..> UC_NER : <<include>>
+UC_Sim ..> UC_DDI : <<include>>
+UC_Sim ..> UC_Risk : <<include>>
+UC_Sim ..> UC_Refill : <<include>>
+UC_Sim ..> UC_KG : <<include>>
+
+' ── DDI 三层 extend ──
+UC_DDI <.. UC_GNN : <<extend>>
+UC_DDI <.. UC_Rule : <<extend>>
+UC_DDI <.. UC_LLM : <<extend>>
+
+' ── 风险评分 extend ──
+UC_Risk <.. UC_Radar : <<extend>>
+UC_Risk <.. UC_Attrib : <<extend>>
+UC_Risk <.. UC_Alt : <<extend>>\\n(风险≥40时)
+
+' ── 替代推荐 extend ──
+UC_Alt <.. UC_Explain : <<extend>>
+
+' ── 续方 extend ──
+UC_Refill <.. UC_Draft : <<extend>>
+
+' ── 处方决策 extend ──
+UC_Sim <.. UC_Adopt : <<extend>>
+UC_Sim <.. UC_Override : <<extend>>
+UC_Adopt ..> UC_Done : <<include>>
+UC_Override ..> UC_Done : <<include>>
+
+' ── 队列→推演 数据传递 ──
+UC_Queue ..> UC_Sim : 携带EHR数据\\n(localStorage)
+
+note bottom of UC_DDI
+  <b>三层DDI检测优先级:</b>
+  ① LLM知识库查表(50+已知对)
+  ② GNN模型预测(AUC=0.905)
+  ③ SIDER副作用交集(回退层)
+  三者融合判定最终严重度
+end note
+
+@enduml`,
+
+  // ── 图3: 医生端活动图 ──
+  'doctor-activity': `@startuml
+' ===== 医生端业务活动图 =====
+skinparam linetype ortho
+skinparam activityBackgroundColor #DBEAFE
+skinparam activityBorderColor #2563EB
+skinparam activityFontSize 12
+skinparam defaultFontSize 12
+skinparam arrowColor #475569
+
+start
+
+:临床医生登录系统;
+
+:查看待诊患者队列;
+
+if (患者状态?) then (高危DDI拦截)
+  :标记为红色高危;
+elseif (慢病续方申请)
+  :标记为黄色续方;
+else (常规复诊)
+  :标记为绿色常规;
+endif
+
+:点击患者 → 自动携带EHR数据;
+
+:进入沙盘推演页面;
+
+|沙盘推演阶段|
+:NER药物实体识别;
+note right: POST /api/parse
+
+partition "三层DDI检测" {
+  :LLM知识库查表;
+  :GNN模型预测;
+  :SIDER规则比对;
+  :融合判定严重度;
+}
+
+:风险量化评分(0-100分);
+note right: POST /api/risk/score
+
+:生成六维雷达图 + 归因剖析;
+
+if (风险分 ≥ 40?) then (是)
+  :触发替代药物推荐;
+  note right: POST /api/recommend/alternative
+  :展示推荐理由;
+else (否)
+endif
+
+:慢病续方检查;
+note right: POST /api/prescription/check
+
+:展示知识图谱可视化;
+
+:生成综合沙盘推演报告;
+
+|决策阶段|
+if (医生决策?) then (采纳AI方案)
+  :下发新处方;
+else (忽略警告)
+  :强制开药;
+endif
+
+:标记已处理;
+
+:返回待诊队列;
+
+stop
+
+@enduml`,
+
+  // ── 图4: 患者端用例图 ──
+  patient: `@startuml
+' ===== 患者端用例图 =====
+left to right direction
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam actorBackgroundColor #D1FAE5
+skinparam actorBorderColor #059669
+skinparam actorFontSize 14
+skinparam actorFontStyle bold
+skinparam usecaseBackgroundColor #FFFFFF
+skinparam usecaseBorderColor #059669
+skinparam packageBorderColor #059669
+skinparam packageBackgroundColor #ECFDF5
+skinparam defaultFontSize 12
+
+actor "患者" as Patient
+
+actor "临床医生" as Doctor <<外部系统>>
+
+rectangle "患者移动端子系统\\n(H5 /patient)" {
+
+  package "用药安全提醒" {
+    usecase "查看用药安全提醒" as UC_Remind
+    usecase "续方进度环可视化\\n(SVG环形图)" as UC_Progress
+    usecase "申请续方" as UC_RefillReq
+  }
+
+  package "症状反馈 (四步剧本流)" {
+    usecase "反馈身体状况\\n(症状上报)" as UC_Symptom
+    usecase "可视化人体图解\\n(器官级别副作用定位)" as UC_Body
+    usecase "智能用药助手聊天\\n(对话式交互)" as UC_Chat
+    usecase "症状恶化自动上报\\n(localStorage跨窗口)" as UC_Report
+  }
+
+  package "处方更新" {
+    usecase "接收处方更新\\n(卡片推送)" as UC_RxUpdate
+    usecase "查看新处方详情\\n(旧药→新药对比)" as UC_RxDetail
+  }
+}
+
+' ── 关联 ──
+Patient --> UC_Remind
+Patient --> UC_Symptom
+Patient --> UC_RefillReq
+
+' ── 用药提醒 include ──
+UC_Remind ..> UC_Progress : <<include>>
+
+' ── 症状反馈 include/extend ──
+UC_Symptom ..> UC_Chat : <<include>>
+UC_Symptom <.. UC_Body : <<extend>>
+UC_Symptom <.. UC_Report : <<extend>>
+
+' ── 续方 ──
+UC_Progress ..> UC_RefillReq : <<extend>>\\n(剩余<7天时)
+
+' ── 处方更新 ──
+UC_RxUpdate ..> UC_RxDetail : <<include>>
+
+' ── 跨系统通知 ──
+UC_Report ..> Doctor : <<notify>>\\n医生工作站提醒
+
+Doctor ..> UC_RxUpdate : <<trigger>>\\n下发新处方
+
+note right of UC_Symptom
+  <b>四步剧本流:</b>
+  ① 安抚消息
+  ② 人体图解(器官高亮)
+  ③ 结构化上报
+  ④ 处方更新卡片
+end note
+
+note bottom of UC_Report
+  通过 localStorage 事件
+  跨窗口通知医生工作站
+  无需 WebSocket 服务器
+end note
+
+@enduml`,
+
+  // ── 图5: 医患联动序列图 ──
+  sequence: `@startuml
+' ===== 医患联动序列图 =====
+skinparam linetype ortho
+skinparam sequenceParticipantBackgroundColor #DBEAFE
+skinparam sequenceParticipantBorderColor #2563EB
+skinparam sequenceArrowColor #475569
+skinparam sequenceLifeLineBorderColor #94A3B8
+skinparam defaultFontSize 12
+skinparam noteBackgroundColor #FEF3C7
+skinparam noteBorderColor #F59E0B
+
+title 医患联动 — localStorage 跨窗口通信序列图
+
+actor "患者" as Patient
+participant "患者端H5\\n(/patient)" as P_H5
+database "localStorage\\n共享存储" as LS
+participant "医生工作台\\n(/doctor)" as D_UI
+actor "临床医生" as Doctor
+
+Patient -> P_H5: 点击症状反馈快捷按钮
+activate P_H5
+
+P_H5 -> P_H5: 第1步: 安抚消息\\n"正在为您分析..."
+P_H5 -> P_H5: 第2步: 人体图解卡片\\n(器官高亮定位副作用)
+P_H5 -> P_H5: 第3步: 结构化上报\\n生成症状报告
+
+P_H5 -> LS: setItem("pharmsandbox_patient_alert")\\n{patientId, symptom, timestamp}
+deactivate P_H5
+note right: 写入localStorage
+
+LS --> D_UI: storage事件触发
+activate D_UI
+D_UI -> D_UI: 对应患者行闪烁高亮
+D_UI -> D_UI: 更新队列排序(优先级提升)
+
+D_UI -> Doctor: 显示"症状恶化"提醒标签
+Doctor -> D_UI: 点击患者, 进入沙盘推演
+D_UI -> D_UI: 分析DDI风险 + 调整处方
+Doctor -> D_UI: 采纳AI方案, 下发新处方
+
+D_UI -> LS: setItem("pharmsandbox_doctor_action")\\n{patientId, newPrescription}
+deactivate D_UI
+
+note over LS: 12秒后自动模拟\\n(或医生手动触发)
+
+LS --> P_H5: polling检测到变化
+activate P_H5
+P_H5 -> P_H5: 第4步: 处方更新卡片\\n(旧药 strikethrough → 新药)
+
+P_H5 -> Patient: 推送处方更新通知
+deactivate P_H5
+
+Patient -> Patient: 查看新处方详情\\n(新旧药物对比)
+
+@enduml`,
+
+  // ── 图6: 药师端用例图 ──
+  pharmacist: `@startuml
+' ===== 药师端用例图 =====
+left to right direction
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam actorBackgroundColor #F3E8FF
+skinparam actorBorderColor #7C3AED
+skinparam actorFontSize 14
+skinparam actorFontStyle bold
+skinparam usecaseBackgroundColor #FFFFFF
+skinparam usecaseBorderColor #7C3AED
+skinparam packageBorderColor #7C3AED
+skinparam packageBackgroundColor #FAF5FF
+skinparam defaultFontSize 12
+
+actor "临床药师" as Pharmacist
+
+rectangle "药师端子系统" {
+
+  usecase "查看待审核处方队列" as UC_P1
+  usecase "审核处方信息" as UC_P2
+  usecase "分析DDI风险\\n(沙盘推演引擎)" as UC_P3
+  usecase "评估替代方案\\n(ATC同类+适应症对比)" as UC_P4
+  usecase "生成审核报告\\n(含风险评估+推荐)" as UC_P5
+  usecase "添加药师批注" as UC_P6
+  usecase "标记已审核" as UC_P7
+}
+
+Pharmacist --> UC_P1
+Pharmacist --> UC_P2
+
+UC_P1 ..> UC_P2 : <<include>>
+UC_P2 ..> UC_P3 : <<include>>
+UC_P3 ..> UC_P4 : <<include>>
+UC_P4 ..> UC_P5 : <<include>>
+UC_P5 ..> UC_P6 : <<extend>>
+UC_P5 ..> UC_P7 : <<include>>
+
+note right of UC_P3
+  复用医生端沙盘推演引擎
+  SandboxEngine.full_simulation()
+  获得DDI检测+风险评分
+  但不执行处方下发
+end note
+
+@enduml`
+};
+
+// ═══════════════════════════════════════════
+//  PlantUML 编码 (用于 plantuml.com 直链)
+// ═══════════════════════════════════════════
+function encodePlantUML(source) {
+  // UTF-8 encode → deflate → strip zlib header(2B)+trailer(4B) → base64 with PlantUML alphabet
+  const utf8 = unescape(encodeURIComponent(source));
+  const compressed = pako.deflate(utf8, { level: 9 });
+  const raw = compressed.slice(2, compressed.length - 4);
+
+  const alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_';
+  let result = '';
+  const len = raw.length;
+  for (let i = 0; i < len; i += 3) {
+    const b1 = raw[i], b2 = raw[i + 1] || 0, b3 = raw[i + 2] || 0;
+    const n = (b1 << 16) | (b2 << 8) | b3;
+    result += alphabet[(n >> 18) & 0x3F];
+    result += alphabet[(n >> 12) & 0x3F];
+    result += alphabet[(n >> 6) & 0x3F];
+    result += alphabet[n & 0x3F];
+  }
+  // Trim padding
+  const pad = len % 3;
+  if (pad === 1) result = result.slice(0, -2);
+  else if (pad === 2) result = result.slice(0, -1);
+
+  return result;
+}
+
+// ═══════════════════════════════════════════
+//  渲染函数：优先 kroki.io，回退 plantuml.com
+// ═══════════════════════════════════════════
+async function renderDiagram(containerId, source) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  // ── 方法1: kroki.io POST API (简单，直接返回 SVG) ──
+  try {
+    const resp = await fetch('https://kroki.io/plantuml/svg', {
+      method: 'POST',
+      body: source,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      signal: AbortSignal.timeout(15000)
+    });
+    if (resp.ok) {
+      const svgText = await resp.text();
+      container.classList.remove('loading');
+      container.innerHTML = svgText;
+      // 让 SVG 自适应
+      const svg = container.querySelector('svg');
+      if (svg) {
+        svg.style.maxWidth = '100%';
+        svg.style.height = 'auto';
+      }
+      return;
+    }
+  } catch (e) {
+    console.warn(`kroki.io failed for ${containerId}, trying plantuml.com fallback...`, e.message);
+  }
+
+  // ── 方法2: plantuml.com 直链回退 ──
+  try {
+    const encoded = encodePlantUML(source);
+    const url = `https://www.plantuml.com/plantuml/svg/${encoded}`;
+    container.classList.remove('loading');
+    container.innerHTML = `<img src="${url}" alt="Use Case Diagram" class="diagram-img" onerror="this.parentElement.innerHTML='<div class=diagram-error>⚠️ PlantUML 渲染失败，请检查网络连接<br><small>两个渲染服务 (kroki.io 和 plantuml.com) 均不可达</small><pre>${escapeHtml(source.substring(0,500))}...</pre></div>'">`;
+  } catch (e) {
+    container.classList.remove('loading');
+    container.innerHTML = `<div class="diagram-error">⚠️ 编码失败: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ═══════════════════════════════════════════
+//  初始化：渲染当前可见 Tab 的图
+// ═══════════════════════════════════════════
+const TAB_DIAGRAMS = {
+  overview: ['diagram-overview'],
+  doctor:   ['diagram-doctor', 'diagram-doctor-activity'],
+  patient:  ['diagram-patient', 'diagram-sequence'],
+  pharmacist: ['diagram-pharmacist']
+};
+
+let rendered = new Set();
+
+async function renderTab(tabName) {
+  const ids = TAB_DIAGRAMS[tabName] || [];
+  const promises = ids
+    .filter(id => !rendered.has(id))
+    .map(id => {
+      // Map container ID to source key
+      const key = id.replace('diagram-', '');
+      const src = DIAGRAMS[key];
+      if (!src) {
+        console.warn(`No source for ${id} (key=${key})`);
+        return Promise.resolve();
+      }
+      rendered.add(id);
+      return renderDiagram(id, src);
+    });
+  await Promise.allSettled(promises);
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const btn = document.querySelector(`.tab-btn[onclick*="${tab}"]`);
+  if (btn) btn.classList.add('active');
+  const panel = document.getElementById('tab-' + tab);
+  if (panel) panel.classList.add('active');
+
+  renderTab(tab);
+}
+
+// ── 启动：渲染默认 Tab (overview) ──
+document.addEventListener('DOMContentLoaded', () => {
+  renderTab('overview');
+});
+</script>
+
+</body>
+</html>
