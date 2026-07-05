@@ -2,13 +2,13 @@
 
 基于图神经网络（GNN）的药物相互作用沙盘推演系统，为重庆大学医学智能体课程设计项目。
 
-> **v2.5** — GNN模型训练完成 + 三端UI + 数据质量修复 + 全模块测试
+> **v3.0** — 全数据训练（TWOSIDES + Decagon 27万DDI对）+ GNN模型大幅升级（AUC 0.918→0.992）+ 三端UI + 全模块测试
 
 ## 核心功能
 
 | 功能 | 说明 | 实现模块 |
 |------|------|----------|
-| **功能①** GNN DDI沙盘推演 | RGCN图神经网络预测药物相互作用（AUC=0.918），无GNN时回退副作用比较 | `src/decision/gnn/` |
+| **功能①** GNN DDI沙盘推演 | RGCN图神经网络预测药物相互作用（AUC=0.992），无GNN时回退副作用比较 | `src/decision/gnn/` |
 | **功能②** 0-100风险量化评分 | SIDER副作用概率 + MIMIC化验值 + 患者疾病史动态加权 | `src/decision/risk_scorer/` |
 | **功能③** 替代药物推荐 | ATC分类树 + 适应症匹配 + 副作用对比推荐同类替代药 | `src/decision/recommender/` |
 | **功能④** 慢病续方触发器 | 自动计算剩余药量，断药前触发续方提醒 + 草稿生成 | `src/decision/prescription_trigger.py` |
@@ -16,18 +16,25 @@
 
 ## GNN 模型性能
 
-基于 TWOSIDES 数据集训练的 RGCN 药物相互作用预测模型：
+基于 TWOSIDES + Decagon 全量数据集训练的 RGCN 药物相互作用预测模型：
 
-| 指标 | 数值 |
-|------|------|
-| **测试 AUC** | **0.9183** |
-| **测试 F1** | **0.8362** |
-| Accuracy | 0.8501 |
-| Precision | 0.8275 |
-| Recall | 0.8515 |
-| 训练药物数 | 2,095 |
-| 知识图谱规模 | 6,775 节点, 351,410 边 |
-| 模型参数量 | 1,147,266 |
+| 指标 | v2.5 (旧) | v3.0 (新) | 提升 |
+|------|-----------|-----------|------|
+| **测试 AUC** | 0.9183 | **0.9921** | +8.0% |
+| **测试 F1** | 0.8362 | **0.9531** | +14.0% |
+| **Accuracy** | 0.8501 | **0.9532** | +12.1% |
+| **Precision** | 0.8275 | **0.9556** | +15.5% |
+| **Recall** | 0.8515 | **0.9532** | +11.9% |
+
+### 训练数据规模
+
+| 维度 | v2.5 (旧) | v3.0 (新) |
+|------|-----------|-----------|
+| DDI正样本 | 22,534 | **274,585** (12.2×) |
+| 数据来源 | TWOSIDES部分 | TWOSIDES全量 + Decagon |
+| 药物数 | 2,095 | **3,730** |
+| 知识图谱 | 6,775节点, 351,410边 | **8,495节点, 352,349边** |
+| 模型参数量 | 1,147,266 | **1,367,426** |
 
 训练脚本：`scripts/train_gnn.py`，模型保存：`models/best_model.pt`
 
@@ -35,14 +42,14 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                      PharmSandbox v2.5                           │
+│                      PharmSandbox v3.0                           │
 ├─────────────────────────────────────────────────────────────────┤
 │ 感知层 (Perception)                                              │
 │   └─ NER药物识别: 100+中文药名 + 商品名 + 剂量提取 + 疾病提取    │
 ├─────────────────────────────────────────────────────────────────┤
 │ 决策层 (Decision)                                                │
 │   ├─ SandboxEngine (统一入口，协调所有子模块)                     │
-│   ├─ GNN DDI推演: RGCN + 知识图谱 (AUC=0.918, 自动检测)         │
+│   ├─ GNN DDI推演: RGCN + 知识图谱 (AUC=0.992, 自动检测)         │
 │   ├─ 严重度融合: GNN + LLM知识库 + 副作用比较，三者取最高        │
 │   ├─ LLM推理器: 14种DDI机制模板 + 多轮对话咨询                   │
 │   ├─ 风险评分: SIDER概率 + MIMIC化验值 + 患者约束动态加权         │
@@ -76,7 +83,7 @@
 
 ```
 PharmSandbox/
-├── src/                              # 核心源代码 (~6,000 行)
+├── src/                              # 核心源代码 (~8,800 行)
 │   ├── config.py                     # 全局配置 (路径/日志/参数)
 │   ├── data/
 │   │   ├── loader.py                 # 统一数据加载器 (缓存+懒加载)
@@ -109,17 +116,17 @@ PharmSandbox/
 │       └── patient_h5.html           # 患者端H5页面
 │
 ├── scripts/
-│   ├── train_gnn.py                  # GNN模型训练脚本
+│   ├── train_gnn.py                  # GNN模型训练脚本 (v2全数据版)
 │   └── build_lab_index.py            # 化验数据预建索引脚本
 │
 ├── models/
-│   ├── best_model.pt                 # 训练好的GNN模型 (AUC=0.918)
+│   ├── best_model.pt                 # 训练好的GNN模型 (AUC=0.992)
 │   └── training_history.json         # 训练历史
 │
 ├── data/                             # 数据集
 │   ├── sider/                        # SIDER副作用数据库
 │   ├── drugcentral/                  # DrugCentral药物靶点
-│   ├── nsides/                       # TWOSIDES/OFFSIDES
+│   ├── nsides/                       # TWOSIDES/OFFSIDES/Decagon
 │   └── mimic/                        # MIMIC-IV临床数据
 │
 ├── tests/
@@ -154,7 +161,7 @@ python scripts/build_lab_index.py
 
 ### 3. (可选) 训练GNN模型
 ```bash
-# 使用TWOSIDES数据训练RGCN模型 (约1-1.5小时)
+# 使用TWOSIDES+Decagon全量数据训练RGCN模型 (约45分钟, CPU)
 python scripts/train_gnn.py
 ```
 
@@ -206,7 +213,7 @@ print(f"GNN可用: {result['analysis']['ddi'].get('gnn_available')}")
 | 数据处理 | Pandas + NumPy + NetworkX |
 | 前端UI | HTML/CSS/JS + Chart.js + vis-network |
 | 数据可视化 | Streamlit + Plotly + PyVis |
-| 数据集 | SIDER + DrugCentral + TWOSIDES + MIMIC-IV |
+| 数据集 | SIDER + DrugCentral + TWOSIDES + Decagon + MIMIC-IV |
 
 ## 数据集
 
@@ -218,7 +225,8 @@ print(f"GNN可用: {result['analysis']['ddi'].get('gnn_available')}")
 | ATC分类 | SIDER | 1,560 条记录 |
 | 药物靶点 | DrugCentral | 药物-靶点相互作用 |
 | 分子结构 | DrugCentral | SMILES格式 |
-| DDI数据 | TWOSIDES | 药物-药物联合副作用 |
+| DDI数据 | TWOSIDES | 42,920,391 条记录 → 211,112 唯一药物对 |
+| DDI数据 | Decagon | 4,649,441 条记录 → 63,473 唯一药物对 |
 | 患者病历 | MIMIC-IV | 364,627 名患者 |
 | 处方数据 | MIMIC-IV | 20,292,611 条处方 |
 | 化验数据 | MIMIC-IV | 158,374,765 条化验记录 |

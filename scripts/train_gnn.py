@@ -1,20 +1,18 @@
 """
-GNN DDI 模型训练脚本
-===================
-基于 TWOSIDES 数据集训练 RGCN 药物相互作用预测模型。
+GNN DDI 模型训练脚本 (v2 - 全数据版)
+====================================
+合并 TWOSIDES全量 + Decagon + hard_negatives 训练 RGCN 药物相互作用预测模型。
 
-流程:
-  1. 构建药物知识图谱（SIDER + DrugCentral + TWOSIDES）
-  2. 准训练数据（正样本=已知DDI, 负样本=随机药物对）
-  3. 训练 RGCN 模型
-  4. 评估（ROC-AUC, Macro-F1, Accuracy）
-  5. 保存最佳模型到 models/best_model.pt
+数据源:
+  - TWOSIDES (42.9M行 → 211,292唯一对, 2,699药物)
+  - ChChSe-Decagon (4.6M行 → 63,473唯一对, 645药物)
+  - hard_negatives.json (3,000对, MIMIC+SIDER挖掘)
+  - SIDER 药物/副作用/适应症 (知识图谱边)
+  - DrugCentral 靶点 (知识图谱边)
 
 用法:
-    cd d:/drug
-    venv/Scripts/python.exe scripts/train_gnn.py
-
-预计时间: 1-1.5 小时（CPU, 16核）
+    cd D:/PharmSandbox
+    python scripts/train_gnn.py
 """
 import sys
 import os
@@ -46,15 +44,13 @@ from src.config import DATA_ROOT, MODEL_ROOT
 # 1. 数据准备
 # ======================================================================
 
-def load_twosides(data_root, max_rows=2000000):
-    """加载 TWOSIDES 药物-药物相互作用数据。"""
-    import gzip
+def load_twosides(data_root):
+    """加载 TWOSIDES 全量药物-药物相互作用数据。"""
     path = data_root / "nsides" / "TWOSIDES.csv.gz"
-    print(f"[数据] 加载 TWOSIDES: {path}", flush=True)
+    print(f"[数据] 加载 TWOSIDES 全量: {path}", flush=True)
 
-    # Check for LFS placeholder
     if path.stat().st_size < 1000:
-        print(f"  TWOSIDES is LFS placeholder ({path.stat().st_size} bytes), using LLM KB only", flush=True)
+        print(f"  TWOSIDES is LFS placeholder ({path.stat().st_size} bytes)", flush=True)
         return [], set()
 
     pairs = set()
@@ -62,7 +58,7 @@ def load_twosides(data_root, max_rows=2000000):
     total_rows = 0
 
     with gzip.open(path, 'rt', encoding='utf-8', errors='replace') as f:
-        header = f.readline()  # 跳过表头
+        header = f.readline()
         cols = header.strip().split(',')
         d1_idx = cols.index('drug_1_concept_name')
         d2_idx = cols.index('drug_2_concept_name')
@@ -77,13 +73,43 @@ def load_twosides(data_root, max_rows=2000000):
                     drugs.add(d2)
                     pairs.add(tuple(sorted([d1, d2])))
             total_rows += 1
-            if total_rows % 500000 == 0:
-                print(f"  已读取 {total_rows:,} 行, {len(pairs)} 对, {len(drugs)} 药物", flush=True)
-            if total_rows >= max_rows:
-                break
+            if total_rows % 5000000 == 0:
+                print(f"  已读取 {total_rows:,} 行, {len(pairs):,} 对, {len(drugs):,} 药物", flush=True)
 
     pairs = list(pairs)
-    print(f"  完成: {len(pairs)} 个唯一药物对, {len(drugs)} 种药物 (来自 {total_rows:,} 条记录)", flush=True)
+    print(f"  完成: {len(pairs):,} 个唯一药物对, {len(drugs):,} 种药物 (来自 {total_rows:,} 条记录)", flush=True)
+    return pairs, drugs
+
+
+def load_decagon(data_root):
+    """加载 ChChSe-Decagon 多药联用副作用数据。"""
+    path = data_root / "nsides" / "ChChSe-Decagon_polypharmacy.csv.gz"
+    if not path.exists():
+        print("[数据] Decagon 文件不存在，跳过", flush=True)
+        return [], set()
+
+    print(f"[数据] 加载 Decagon: {path}", flush=True)
+    pairs = set()
+    drugs = set()
+    total_rows = 0
+
+    with gzip.open(path, 'rt', encoding='utf-8', errors='replace') as f:
+        header = f.readline()  # STITCH 1,STITCH 2,Polypharmacy Side Effect,Side Effect Name
+        for line in f:
+            parts = line.strip().split(',')
+            if len(parts) >= 2:
+                d1 = parts[0].strip().lower()
+                d2 = parts[1].strip().lower()
+                if d1 and d2 and d1 != d2:
+                    drugs.add(d1)
+                    drugs.add(d2)
+                    pairs.add(tuple(sorted([d1, d2])))
+            total_rows += 1
+            if total_rows % 1000000 == 0:
+                print(f"  已读取 {total_rows:,} 行, {len(pairs):,} 对, {len(drugs):,} 药物", flush=True)
+
+    pairs = list(pairs)
+    print(f"  完成: {len(pairs):,} 个唯一药物对, {len(drugs):,} 种药物 (来自 {total_rows:,} 条记录)", flush=True)
     return pairs, drugs
 
 
@@ -119,7 +145,6 @@ def build_knowledge_graph_edges(data_root, drug_to_idx):
                           names=['cid', 'drug_name', 'se_id', 'umls_id'])
     cid_to_name = dict(zip(name_df['cid'], name_df['drug_name'].str.strip().str.lower()))
 
-    # 收集副作用节点
     se_nodes = {}
     se_count = 0
 
@@ -135,7 +160,7 @@ def build_knowledge_graph_edges(data_root, drug_to_idx):
         if drug_name and drug_name in drug_to_idx and se_name and se_name != 'nan':
             if se_name not in se_nodes:
                 se_nodes[se_name] = len(drug_to_idx) + len(se_nodes)
-            edges.append((drug_to_idx[drug_name], se_nodes[se_name], 0))  # type 0: has_side_effect
+            edges.append((drug_to_idx[drug_name], se_nodes[se_name], 0))
             se_count += 1
 
     print(f"  [OK] 副作用边: {se_count}, 副作用节点: {len(se_nodes)}", flush=True)
@@ -157,7 +182,7 @@ def build_knowledge_graph_edges(data_root, drug_to_idx):
         if drug_name and drug_name in drug_to_idx and ind_name and ind_name != 'nan':
             if ind_name not in ind_nodes:
                 ind_nodes[ind_name] = len(drug_to_idx) + len(se_nodes) + len(ind_nodes)
-            edges.append((drug_to_idx[drug_name], ind_nodes[ind_name], 1))  # type 1: has_indication
+            edges.append((drug_to_idx[drug_name], ind_nodes[ind_name], 1))
             ind_count += 1
 
     print(f"  [OK] 适应症边: {ind_count}, 适应症节点: {len(ind_nodes)}", flush=True)
@@ -187,7 +212,7 @@ def build_knowledge_graph_edges(data_root, drug_to_idx):
                 if drug_name in drug_to_idx and target_name and target_name != 'nan':
                     if target_name not in target_nodes:
                         target_nodes[target_name] = len(drug_to_idx) + len(se_nodes) + len(ind_nodes) + len(target_nodes)
-                    edges.append((drug_to_idx[drug_name], target_nodes[target_name], 2))  # type 2: targets
+                    edges.append((drug_to_idx[drug_name], target_nodes[target_name], 2))
                     target_count += 1
             print(f"  [OK] 靶点边: {target_count}, 靶点节点: {len(target_nodes)}", flush=True)
         else:
@@ -224,7 +249,6 @@ def load_hard_negatives(data_root):
 def prepare_training_data(ddi_pairs, drug_to_idx, num_drugs, neg_ratio=1, hard_negatives=None):
     """
     准备训练数据：正样本=已知DDI对, 负样本=硬负样本+随机负样本。
-    hard_negatives: list of (drug_name_a, drug_name_b) tuples
     """
     print(f"[数据] 准备训练数据 (负采样比例={neg_ratio})...", flush=True)
 
@@ -234,7 +258,7 @@ def prepare_training_data(ddi_pairs, drug_to_idx, num_drugs, neg_ratio=1, hard_n
         if d1 in drug_to_idx and d2 in drug_to_idx:
             pos_pairs.append((drug_to_idx[d1], drug_to_idx[d2]))
 
-    print(f"  正样本: {len(pos_pairs)}", flush=True)
+    print(f"  正样本: {len(pos_pairs):,}", flush=True)
 
     # 建立已知DDI集合（排除用）
     ddi_set = set()
@@ -246,7 +270,7 @@ def prepare_training_data(ddi_pairs, drug_to_idx, num_drugs, neg_ratio=1, hard_n
     # --- 负样本混合策略 ---
     neg_pairs = []
 
-    # 优先使用硬负样本（高质量负样本，教会模型别盯着副作用数）
+    # 优先使用硬负样本
     if hard_negatives:
         for d1_name, d2_name in hard_negatives:
             if d1_name in drug_to_idx and d2_name in drug_to_idx:
@@ -255,7 +279,7 @@ def prepare_training_data(ddi_pairs, drug_to_idx, num_drugs, neg_ratio=1, hard_n
                 if pair not in ddi_set:
                     neg_pairs.append(pair)
                     ddi_set.add(pair)
-        print(f"  硬负样本: {len(neg_pairs)}", flush=True)
+        print(f"  硬负样本: {len(neg_pairs):,}", flush=True)
 
     # 剩余配额用随机负样本补足
     target_neg = len(pos_pairs) * neg_ratio
@@ -272,7 +296,7 @@ def prepare_training_data(ddi_pairs, drug_to_idx, num_drugs, neg_ratio=1, hard_n
                 ddi_set.add(pair)
         attempts += 1
 
-    print(f"  总负样本: {len(neg_pairs)} (含 {sum(1 for p in neg_pairs if p not in [(min(drug_to_idx.get(h[0],-1), drug_to_idx.get(h[1],-1)), max(drug_to_idx.get(h[0],-1), drug_to_idx.get(h[1],-1))) for h in (hard_negatives or [])])} random)", flush=True)
+    print(f"  总负样本: {len(neg_pairs):,}", flush=True)
 
     # 合并并打乱
     all_pairs = pos_pairs + neg_pairs
@@ -305,7 +329,7 @@ def prepare_training_data(ddi_pairs, drug_to_idx, num_drugs, neg_ratio=1, hard_n
         },
     }
 
-    print(f"  训练集: {n_train}, 验证集: {n_val}, 测试集: {n - n_train - n_val}", flush=True)
+    print(f"  训练集: {n_train:,}, 验证集: {n_val:,}, 测试集: {n - n_train - n_val:,}", flush=True)
     return data
 
 
@@ -314,11 +338,7 @@ def prepare_training_data(ddi_pairs, drug_to_idx, num_drugs, neg_ratio=1, hard_n
 # ======================================================================
 
 class FocalLoss(nn.Module):
-    """Focal Loss for imbalanced DDI classification.
-    Focuses training on hard examples, reducing false positives from easy negatives.
-    gamma=2.0 puts more weight on misclassified samples.
-    alpha=0.75 gives positive (DDI) samples higher weight to reduce false negatives.
-    """
+    """Focal Loss for imbalanced DDI classification."""
     def __init__(self, alpha=0.75, gamma=2.0):
         super().__init__()
         self.alpha = alpha
@@ -335,8 +355,8 @@ class FocalLoss(nn.Module):
 class DDIPredictor(nn.Module):
     """RGCN 药物相互作用预测器。"""
 
-    def __init__(self, num_nodes, num_relations, hidden_dim=64,
-                 num_layers=2, num_classes=2, dropout=0.3):
+    def __init__(self, num_nodes, num_relations, hidden_dim=128,
+                 num_layers=3, num_classes=2, dropout=0.3):
         super().__init__()
         self.num_nodes = num_nodes
         self.num_relations = num_relations
@@ -451,12 +471,16 @@ class Trainer:
         ei = edge_index.to(self.device)
         et = edge_type.to(self.device)
 
+        # 优化：评估时只编码一次全图
+        node_emb = self.model.encode(ei, et)
+
         all_logits = []
         batch_size = self.config['batch_size']
 
         for start in range(0, len(d1), batch_size):
             end = min(start + batch_size, len(d1))
-            logits = self.model(ei, et, d1[start:end], d2[start:end])
+            pair = torch.cat([node_emb[d1[start:end]], node_emb[d2[start:end]]], dim=-1)
+            logits = self.model.classifier(pair)
             all_logits.append(logits.cpu())
 
         all_logits = torch.cat(all_logits)
@@ -464,7 +488,6 @@ class Trainer:
         preds = all_logits.argmax(dim=-1).numpy()
         labels_np = labels.cpu().numpy()
 
-        # 计算指标
         from sklearn.metrics import roc_auc_score, f1_score, accuracy_score, precision_score, recall_score
 
         metrics = {
@@ -545,23 +568,23 @@ class Trainer:
 
 def main():
     print("=" * 60, flush=True)
-    print("  PharmSandbox GNN DDI 模型训练", flush=True)
+    print("  PharmSandbox GNN DDI 模型训练 (v2 全数据版)", flush=True)
     print("=" * 60, flush=True)
 
     data_root = DATA_ROOT
     model_root = MODEL_ROOT
     model_root.mkdir(parents=True, exist_ok=True)
 
-    # ---- 配置（优化版） ----
+    # ---- 配置（适配大数据量） ----
     config = {
-        'hidden_dim': 64,
-        'num_layers': 2,
+        'hidden_dim': 128,      # 64→128
+        'num_layers': 3,        # 2→3
         'dropout': 0.3,
-        'lr': 0.003,
+        'lr': 0.002,            # 适中的学习率
         'weight_decay': 1e-4,
-        'batch_size': 64,
-        'epochs': 30,
-        'patience': 8,
+        'batch_size': 4096,     # 平衡：足够多的更新次数 + 合理的训练时间
+        'epochs': 50,           # 足够收敛
+        'patience': 10,
         'neg_ratio': 1,
     }
 
@@ -569,45 +592,41 @@ def main():
     print(f"数据目录: {data_root}", flush=True)
     print(f"模型目录: {model_root}", flush=True)
 
-    # ---- 1. 加载数据 ----
+    # ---- 1. 加载所有DDI数据源 ----
     print(f"\n{'─'*60}", flush=True)
-    print("阶段 1: 加载数据", flush=True)
+    print("阶段 1: 加载所有DDI数据源", flush=True)
     print(f"{'─'*60}", flush=True)
 
-    ddi_pairs, twosides_drugs = load_twosides(data_root)
+    # 1a. TWOSIDES 全量
+    twosides_pairs, twosides_drugs = load_twosides(data_root)
 
-    # 加载 Decagon 数据集（补充TWOSIDES不覆盖的DDI对）
-    decagon_path = PROJECT_ROOT / "data" / "combined_ddi_pairs.json"
-    if decagon_path.exists():
-        with open(decagon_path) as f:
-            combined = json.load(f)
-        ddi_pairs = [(d1, d2) for d1, d2 in combined]
-        print(f"[数据] 使用合并DDI数据集 (TWOSIDES + Decagon): {len(ddi_pairs)} 对", flush=True)
+    # 1b. Decagon
+    decagon_pairs, decagon_drugs = load_decagon(data_root)
 
+    # 1c. 合并所有DDI对（去重）
+    all_ddi_set = set()
+    for d1, d2 in twosides_pairs:
+        all_ddi_set.add(tuple(sorted([d1, d2])))
+    for d1, d2 in decagon_pairs:
+        all_ddi_set.add(tuple(sorted([d1, d2])))
+
+    ddi_pairs = list(all_ddi_set)
+    print(f"\n[数据] 合并DDI数据集:", flush=True)
+    print(f"  TWOSIDES: {len(twosides_pairs):,} 对", flush=True)
+    print(f"  Decagon:  {len(decagon_pairs):,} 对", flush=True)
+    print(f"  合并去重: {len(ddi_pairs):,} 对", flush=True)
+
+    # 1d. 加载SIDER药物名
     sider_drugs = load_sider_drugs(data_root)
 
-    # 合并所有药物名（SIDER + TWOSIDES 并集）
-    all_drugs = sider_drugs | twosides_drugs
-
-    # 也从DDI对中添加药物
+    # 1e. 合并所有药物名
+    all_drugs = sider_drugs | twosides_drugs | decagon_drugs
     for d1, d2 in ddi_pairs:
-        all_drugs.add(d1); all_drugs.add(d2)
-    print(f"[数据] 药物并集: {len(all_drugs)} 种", flush=True)
+        all_drugs.add(d1)
+        all_drugs.add(d2)
+    print(f"[数据] 药物并集: {len(all_drugs):,} 种", flush=True)
 
-    # Fallback: 如果DDI数据不可用，用LLM知识库作为正样本
-    if not ddi_pairs:
-        print("[数据] DDI数据不可用，使用LLM知识库作为正样本", flush=True)
-        from src.decision.llm_reasoner import KNOWN_DDI_KB
-        llm_pairs = []
-        for (a, b) in KNOWN_DDI_KB:
-            llm_pairs.append((a, b))
-            all_drugs.add(a)
-            all_drugs.add(b)
-        valid_pairs = [(d1, d2) for d1, d2 in llm_pairs if d1 in all_drugs and d2 in all_drugs]
-    else:
-        valid_pairs = [(d1, d2) for d1, d2 in ddi_pairs if d1 in all_drugs and d2 in all_drugs]
-    print(f"[数据] 有效DDI对: {len(valid_pairs)}", flush=True)
-
+    # 1f. 构建药物索引
     drug_to_idx, drug_list = build_drug_index(all_drugs)
 
     # ---- 2. 构建知识图谱 ----
@@ -617,7 +636,6 @@ def main():
 
     edges, edge_type_names, total_nodes, num_drugs = build_knowledge_graph_edges(data_root, drug_to_idx)
 
-    # 转换为张量
     edge_index = torch.tensor([[e[0] for e in edges], [e[1] for e in edges]], dtype=torch.long)
     edge_type = torch.tensor([e[2] for e in edges], dtype=torch.long)
 
@@ -627,7 +645,7 @@ def main():
     print(f"{'─'*60}", flush=True)
 
     hard_negatives, _ = load_hard_negatives(data_root)
-    data = prepare_training_data(valid_pairs, drug_to_idx, num_drugs,
+    data = prepare_training_data(ddi_pairs, drug_to_idx, num_drugs,
                                  neg_ratio=config['neg_ratio'],
                                  hard_negatives=hard_negatives)
 
@@ -669,6 +687,14 @@ def main():
     print("阶段 6: 保存模型", flush=True)
     print(f"{'─'*60}", flush=True)
 
+    # 备份旧模型
+    old_model_path = model_root / "best_model.pt"
+    if old_model_path.exists():
+        backup_path = model_root / "best_model_v1_backup.pt"
+        import shutil
+        shutil.copy2(old_model_path, backup_path)
+        print(f"旧模型已备份: {backup_path}", flush=True)
+
     save_path = model_root / "best_model.pt"
     checkpoint = {
         'model_state_dict': model.state_dict(),
@@ -679,6 +705,13 @@ def main():
         'total_nodes': total_nodes,
         'num_drugs': num_drugs,
         'history': history,
+        'training_version': 'v2_full_data',
+        'data_sources': {
+            'twosides_pairs': len(twosides_pairs),
+            'decagon_pairs': len(decagon_pairs),
+            'merged_ddi_pairs': len(ddi_pairs),
+            'total_drugs': len(all_drugs),
+        },
     }
     torch.save(checkpoint, save_path)
     print(f"模型已保存: {save_path}", flush=True)
@@ -696,7 +729,8 @@ def main():
     print(f"{'='*60}", flush=True)
     print(f"  药物数: {num_drugs}", flush=True)
     print(f"  知识图谱: {total_nodes} 节点, {len(edges)} 边", flush=True)
-    print(f"  训练样本: {len(data['train']['labels'])}", flush=True)
+    print(f"  DDI对: {len(ddi_pairs):,} (TWOSIDES {len(twosides_pairs):,} + Decagon {len(decagon_pairs):,})", flush=True)
+    print(f"  训练样本: {len(data['train']['labels']):,}", flush=True)
     print(f"  测试 AUC: {test_metrics['auc']:.4f}", flush=True)
     print(f"  测试 F1:  {test_metrics['f1']:.4f}", flush=True)
     print(f"  模型路径: {save_path}", flush=True)
