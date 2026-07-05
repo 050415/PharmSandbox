@@ -11,13 +11,7 @@ venv/
 .venv/
 
 # Data (too large for git)
-data/sider/*.gz
-data/sider/*.tsv
-data/drugcentral/*.gz
-data/drugcentral/*.tsv
-data/drugcentral/*.csv
-data/nsides/*.gz
-data/mimic/*.gz
+data/
 
 # Reference projects (zips)
 references/*.zip
