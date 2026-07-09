@@ -10,8 +10,11 @@ build/
 venv/
 .venv/
 
-# Data (too large for git)
-data/
+# Data (exclude large MIMIC files, keep SIDER essentials)
+data/mimic/*.gz
+data/mimic/lab_index/
+data/zip
+data/nictation
 
 # Reference projects (zips)
 references/*.zip
