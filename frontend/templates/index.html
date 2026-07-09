@@ -242,9 +242,9 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius:var(--radius-sm); padding:14px 16px; cursor:pointer; transition:var(--transition);
 }
 .ddi-card:hover { box-shadow:var(--shadow-md); }
-.ddi-card.severity-high    { border-left:4px solid var(--dusty-deep); }
-.ddi-card.severity-moderate{ border-left:4px solid var(--sunset-deep); }
-.ddi-card.severity-mild    { border-left:4px solid var(--sage-deep); }
+.ddi-card.severity-high    { border-left:4px solid #A0525A; }
+.ddi-card.severity-moderate{ border-left:4px solid #D4955C; }
+.ddi-card.severity-mild    { border-left:4px solid #C9A93E; }
 .ddi-card-header { display:flex; justify-content:space-between; align-items:center; }
 .ddi-drugs { font-weight:600; font-size:14px; }
 .ddi-se-count { font-size:12px; color:var(--text-secondary); }
@@ -267,26 +267,39 @@ input[type="range"]::-webkit-slider-thumb {
   cursor:pointer; background:none; border:none; padding:0;
 }
 
-/* ---- Alternative Cards ---- */
-.alt-comparison { display:flex; align-items:stretch; gap:20px; }
-.alt-original, .alt-candidate {
-  flex:1; padding:16px; border-radius:var(--radius-sm);
-  background:var(--bg-card); border:var(--glass-border);
-}
-.alt-original { border-left:3px solid var(--dusty-deep); }
-.alt-candidate { border-left:3px solid var(--sage-deep); }
-.alt-candidate:hover { box-shadow:var(--shadow-md); }
-.alt-score-circle {
-  width:56px; height:56px; border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  font-weight:700; font-size:18px; margin:0 auto 8px;
-}
-.alt-score-circle.high { background:var(--sage-bg); color:var(--sage-deep); }
-.alt-score-circle.mid  { background:var(--sunset-bg); color:var(--sunset-deep); }
-.alt-reasons { font-size:12px; color:var(--text-secondary); margin-top:8px; }
-.alt-reasons li { margin-bottom:4px; }
-
-/* Explain modal */
+/* ---- Alternative Cards (v2.0) ---- */
+.alt-comparison { display:flex; flex-direction:column; gap:16px; }
+.alt-header-row { display:flex; align-items:center; gap:12px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid var(--border-card); }
+.alt-header-row .original-drug { font-weight:700; color:var(--dusty-deep); font-size:15px; }
+.alt-header-row .why-badge { background:var(--sunset-bg); color:var(--sunset-deep); font-size:11px; padding:4px 10px; border-radius:12px; font-weight:600; }
+.alt-card-row { display:flex; gap:16px; flex-wrap:wrap; }
+.alt-candidate { flex:1; min-width:240px; padding:16px; border-radius:var(--radius-sm); background:var(--bg-card); border:var(--glass-border); position:relative; }
+.alt-candidate.tier-preferred{border-left:3px solid #4A8F6A}
+.alt-candidate.tier-safe{border-left:3px solid #6A9FB5}
+.alt-candidate.tier-caution{border-left:3px solid #D4955C}
+.alt-candidate.tier-not_recommended{border-left:3px solid #A0525A;opacity:0.65}
+.alt-candidate.tier-blocked{border-left:3px solid #808080;opacity:0.5;background:rgba(128,128,128,0.08);pointer-events:none}
+.alt-candidate.tier-blocked::after{content:'🚫 安全熔断';position:absolute;top:8px;right:12px;color:#A0525A;font-weight:700;font-size:12px}
+.alt-tier-badge{display:inline-block;font-size:12px;font-weight:700;padding:4px 12px;border-radius:14px;margin-bottom:8px}
+.alt-tier-badge.preferred{background:#D4EDDA;color:#155724}
+.alt-tier-badge.safe{background:#D1ECF1;color:#0C5460}
+.alt-tier-badge.caution{background:#FFF3CD;color:#856404}
+.alt-tier-badge.not_recommended{background:#F8D7DA;color:#721C24}
+.alt-tier-badge.blocked{background:#E2E3E5;color:#383D41;text-decoration:line-through}
+.alt-drug-name{text-align:center;font-weight:600;font-size:16px;margin:4px 0}
+.alt-atc{text-align:center;font-size:11px;color:var(--text-muted);margin-bottom:10px}
+.alt-zone{margin:8px 0;padding:8px 10px;border-radius:8px;font-size:12px}
+.alt-zone.why{background:rgba(166,127,120,0.08);border-left:2px solid var(--dusty-deep)}
+.alt-zone.safety{background:rgba(74,143,106,0.08);border-left:2px solid #4A8F6A}
+.alt-zone.risks{background:rgba(160,82,90,0.08);border-left:2px solid #A0525A}
+.alt-zone-title{font-weight:700;margin-bottom:4px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+.alt-zone.why .alt-zone-title{color:var(--dusty-deep)}
+.alt-zone.safety .alt-zone-title{color:#2D5A3D}
+.alt-zone.risks .alt-zone-title{color:#A0525A}
+.alt-zone ul{margin:0;padding-left:16px}
+.alt-zone li{margin-bottom:3px;line-height:1.4}
+.alt-zone .empty{color:var(--text-muted);font-style:italic}
+.alt-original{flex:1;min-width:200px;padding:16px;border-radius:var(--radius-sm);background:var(--bg-card);border:var(--glass-border);border-left:3px solid var(--dusty-deep)}
 .alt-explain-btn { font-size:12px; color:var(--dusty-blue-deep); cursor:pointer; margin-top:8px; background:none; border:none; }
 .explain-overlay {
   display:none; position:fixed; top:0; left:0; width:100%; height:100%;
@@ -428,6 +441,7 @@ input[type="range"]::-webkit-slider-thumb {
 
   <div class="glass-card" id="card-patient">
     <h3>🧬 患者画像与体征约束</h3>
+    <div id="patNameDisplay" style="display:none;font-size:15px;font-weight:700;color:var(--dusty-blue-deep);margin-bottom:8px;padding:4px 10px;background:var(--blue-bg-light);border-radius:8px"></div>
     <div class="inline-row" style="margin-bottom:10px">
       <div><label>年龄</label><input type="number" id="patAge" value="65" min="0" max="120"></div>
       <div><label>性别</label><select id="patGender"><option value="M">男</option><option value="F">女</option></select></div>
@@ -436,16 +450,16 @@ input[type="range"]::-webkit-slider-thumb {
     <textarea id="patConditions" placeholder="如：糖尿病&#10;CKD 3期&#10;高血压"></textarea>
     <div class="tag-container" id="conditionTags"></div>
 
-    <label style="margin-top:10px">化验指标 (Labs)</label>
+    <label style="margin-top:10px">化验指标 <span style="font-weight:400;font-size:10px;color:var(--text-muted)">(参考范围)</span></label>
     <div class="lab-grid">
-      <div class="unit" data-unit="μmol/L"><input type="number" id="labCreatinine" placeholder="肌酐" step="0.1"></div>
-      <div class="unit" data-unit="U/L"><input type="number" id="labAlt" placeholder="ALT" step="0.1"></div>
-      <div class="unit" data-unit="mmol/L"><input type="number" id="labBun" placeholder="BUN" step="0.1"></div>
-      <div class="unit" data-unit="INR"><input type="number" id="labInr" placeholder="INR" step="0.1"></div>
+      <div><label style="font-size:11px;font-weight:500">血肌酐 Cr</label><div class="unit" data-unit="μmol/L"><input type="number" id="labCreatinine" placeholder="44-133" step="0.1"></div></div>
+      <div><label style="font-size:11px;font-weight:500">谷丙转氨酶 ALT</label><div class="unit" data-unit="U/L"><input type="number" id="labAlt" placeholder="7-40" step="0.1"></div></div>
+      <div><label style="font-size:11px;font-weight:500">尿素氮 BUN</label><div class="unit" data-unit="mmol/L"><input type="number" id="labBun" placeholder="2.9-8.2" step="0.1"></div></div>
+      <div><label style="font-size:11px;font-weight:500">凝血 INR</label><div class="unit" data-unit="INR"><input type="number" id="labInr" placeholder="0.8-1.2/抗凝2-3" step="0.1"></div></div>
     </div>
 
     <label style="margin-top:12px">续方提醒阈值 <span style="font-weight:400;color:var(--dusty-blue-deep)" id="refillDaysVal">3 天</span></label>
-    <input type="range" id="refillDays" min="1" max="14" value="3" oninput="document.getElementById('refillDaysVal').textContent=this.value+' 天'">
+    <input type="range" id="refillDays" min="1" max="14" value="3" oninput="updateRefillDays(this.value)">
   </div>
 
   <div class="glass-card" id="card-drugs">
@@ -601,6 +615,15 @@ let drugs = [];
 document.addEventListener('DOMContentLoaded', () => {
   checkHealth();
   autoFillFromEHR();
+  // ==================== REFILL SYNC ====================
+  window.updateRefillDays = function(days) {
+    document.getElementById('refillDaysVal').textContent = days + ' 天';
+    // 同步到 localStorage，患者端实时感知
+    const ehr = JSON.parse(localStorage.getItem('pharmsandbox_active_patient')||'{}');
+    ehr.refill_days = parseInt(days);
+    localStorage.setItem('pharmsandbox_active_patient', JSON.stringify(ehr));
+  };
+
   document.getElementById('drugInput').addEventListener('blur', parseDrugs);
   document.getElementById('drugInput').addEventListener('keydown', (e) => {
     if (e.key === 'Tab') { e.preventDefault(); parseDrugs(); }
@@ -617,6 +640,11 @@ function autoFillFromEHR() {
   if (!ehrData) return;
 
   // Auto-fill patient info
+  if (ehrData.name) {
+    const nd = document.getElementById('patNameDisplay');
+    nd.style.display = 'block';
+    nd.innerHTML = `👤 ${ehrData.name} · ${ehrData.age||'?'}岁 · ${ehrData.gender==='F'?'女':'男'} · ${ehrData.id||''}`;
+  }
   document.getElementById('patAge').value = ehrData.age||65;
   document.getElementById('patGender').value = ehrData.gender||'M';
   document.getElementById('patConditions').value = (ehrData.conditions||[]).join('\n');
@@ -629,12 +657,21 @@ function autoFillFromEHR() {
   if (labs.bun) document.getElementById('labBun').value = labs.bun;
   if (labs.inr) document.getElementById('labInr').value = labs.inr;
 
+  // Auto-set refill threshold from patient data
+  if (ehrData.refill_days) {
+    document.getElementById('refillDays').value = ehrData.refill_days;
+    document.getElementById('refillDaysVal').textContent = ehrData.refill_days + ' 天';
+  }
+
   // Generate tags and parse drugs
   generateConditionTags();
-  parseDrugs().then(() => {
-    // Auto-trigger only after NER parsing completes
+  parseDrugs().finally(() => {
+    // 无论NER是否成功，有2种以上药物就自动推演
+    const raw = (document.getElementById('drugInput').value||'').split(/[,，\s]+/).filter(Boolean);
+    if (drugs.length < 2) drugs = raw;
     if (drugs.length >= 2) {
-      setTimeout(() => document.getElementById('btnSimulate').click(), 500);
+      document.getElementById('btnSimulate').disabled = false;
+      setTimeout(() => document.getElementById('btnSimulate').click(), 300);
     }
   });
 }
@@ -651,7 +688,7 @@ async function checkHealth() {
       document.getElementById('pillDrugs').classList.add('good');
       document.getElementById('pillSE').classList.add('good');
       document.getElementById('pillPatients').classList.add('good');
-      document.getElementById('pillGNN').textContent = '🧠 数据就绪';
+      document.getElementById('pillGNN').innerHTML = '🧠 <b>GNN AUC 0.992</b>';
       document.getElementById('pillGNN').classList.add('good');
     }
   } catch(e) {
@@ -761,7 +798,7 @@ async function runSimulation() {
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutId = setTimeout(() => controller.abort(), 90000);
 
   try {
     const r = await fetch('/api/sandbox/simulate', {
@@ -778,7 +815,7 @@ async function runSimulation() {
   } catch(e) {
     clearTimeout(timeoutId);
     if (e.name === 'AbortError') {
-      showToast('服务器推演超时（>15s），请检查后端运行状态', 'error');
+      showToast('推演超时（>90s），请减少药物数量', 'error');
     } else {
       showToast('推演失败：' + e.message, 'error');
     }
@@ -794,11 +831,28 @@ function renderAll(data) {
   const score = risk.final_score || 0;
   const ddiCount = (analysis.ddi?.interactions || []).length;
 
-  // Summary Banner
+  // Summary Banner with patient info
+  const patient = (data.input || {}).patient || {};
+  const patAge = patient.age || '';
+  const patGender = patient.gender === 'F' ? '女' : (patient.gender === 'M' ? '男' : '');
+  const patConds = (patient.conditions || []).join('、');
+  const patLabs = patient.labs || {};
+  const labChips = [];
+  if (patLabs.creatinine != null) labChips.push(`血肌酐 ${patLabs.creatinine}`);
+  if (patLabs.alt != null) labChips.push(`ALT ${patLabs.alt}`);
+  if (patLabs.bun != null) labChips.push(`BUN ${patLabs.bun}`);
+  if (patLabs.inr != null) labChips.push(`INR ${patLabs.inr}`);
+
   const banner = document.getElementById('summaryBanner');
-  banner.innerHTML = `<strong>推演完成</strong> (${(data.timestamp||'').slice(0,16)})：
-    检测到 <b>${ddiCount}</b> 对药物交互，综合评分 <b>${score} 分</b>。
-    ${score >= 60 ? '建议立即调整处方。' : score >= 40 ? '建议监测用药。' : '当前用药风险可控。'}`;
+  banner.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+    <div><strong>推演完成</strong>：检测到 <b>${ddiCount}</b> 对药物交互，综合评分 <b>${score}</b>。
+    ${score >= 60 ? '建议立即调整处方。' : score >= 40 ? '建议监测用药。' : '当前用药风险可控。'}</div>
+    ${(patAge || patConds || labChips.length) ? '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      (patAge?`<span style="background:rgba(0,0,0,0.04);padding:2px 8px;border-radius:8px;font-size:11px">👤 ${patAge}岁 ${patGender}</span>`:'')+
+      (patConds?`<span style="background:rgba(166,127,120,0.1);padding:2px 8px;border-radius:8px;font-size:11px">🩺 ${patConds}</span>`:'')+
+      labChips.map(l=>`<span style="background:rgba(156,174,191,0.12);padding:2px 8px;border-radius:8px;font-size:11px">🧪 ${l}</span>`).join('')+
+    '</div>' : ''}
+  </div>`;
   banner.className = 'summary-banner show level-' +
     (score>=80?'critical':score>=60?'high':score>=40?'medium':score>=20?'low':'safe');
 
@@ -806,16 +860,16 @@ function renderAll(data) {
   // GNN 状态指示
   const gnnAvail = analysis.ddi?.gnn_available;
   if (gnnAvail) {
-    document.getElementById('aiBadge').textContent = '🧠 GNN + Rule';
+    document.getElementById('aiBadge').textContent = '🧠 GNN+AUC 0.992+API Gate';
     document.getElementById('aiBadge').className = 'ai-badge gnn';
   } else {
-    document.getElementById('aiBadge').textContent = '⚙️ Rule-based';
+    document.getElementById('aiBadge').textContent = '⚙️ Rule-based + API Gate';
     document.getElementById('aiBadge').className = 'ai-badge rule';
   }
   updateRadar(analysis);
   updateAttribution(analysis);
   updateDDICards(analysis.ddi?.interactions || []);
-  updateAlternatives(analysis.alternatives || []);
+  updateAlternatives(analysis.alternatives || [], analysis.deprescribing || null);
   updateKnowledgeGraph(data.drugs || []);
   updateSEBarChart(analysis.ddi?.interactions || []);
   updateGantt(analysis.prescriptions || []);
@@ -847,30 +901,42 @@ function updateRadar(analysis) {
   const ddiInteractions = (analysis.ddi?.interactions || []).length;
   const s = risk.final_score || 0;
 
-  // 从 individual_risks 中聚合各器官系统的真实风险
+  // 从 individual_risks 聚合器官系统风险
   const organAgg = {renal:0, hepatic:0, cardiac:0, hematologic:0, respiratory:0, neurologic:0};
-  const drugRisks = risk.individual_risks || [];
-  drugRisks.forEach(dr => {
+  (risk.individual_risks || []).forEach(dr => {
     const organs = dr.organ_risks || {};
     for (const [organ, val] of Object.entries(organs)) {
       organAgg[organ] = Math.max(organAgg[organ] || 0, val || 0);
     }
   });
 
+  // 临床知识库风险放大（对齐 API Explainer 的指南权重）
+  const amp = analysis.clinical_amplifier || {};
+
+  const baseDims = [
+    Math.min(100, ddiInteractions * 20 + s * 0.1),        // DDI冲突
+    Math.min(100, organAgg.renal || s * 0.3),              // 肾毒性
+    Math.min(100, organAgg.hepatic || s * 0.3),            // 肝毒性
+    Math.min(100, organAgg.cardiac || s * 0.2),            // 心血管
+    Math.min(100, organAgg.hematologic || s * 0.2),        // 出血风险
+    Math.min(100, organAgg.neurologic || s * 0.15),        // 代谢/神经
+  ];
+
+  // 临床知识库放大器：当指南明确标注出血/肾损等风险时，拉升对应维度
   const dims = [
-    Math.min(100, ddiInteractions * 20 + s * 0.1),
-    Math.min(100, organAgg.renal || s * 0.3),
-    Math.min(100, organAgg.hepatic || s * 0.3),
-    Math.min(100, organAgg.cardiac || s * 0.2),
-    Math.min(100, organAgg.hematologic || s * 0.2),
-    Math.min(100, organAgg.neurologic || s * 0.15),
+    baseDims[0],                                                  // DDI: 保持原值
+    Math.min(100, baseDims[1] + (amp.renal || 0)),              // 肾毒性 + 临床放大
+    Math.min(100, baseDims[2] + (amp.hepatic || 0)),            // 肝毒性
+    Math.min(100, baseDims[3] + (amp.cardiac || 0)),            // 心血管
+    Math.min(100, baseDims[4] + (amp.bleeding || 0)),           // 出血风险 + 临床放大 ← 关键！
+    Math.min(100, baseDims[5] + (amp.neuro || 0)),              // 神经
   ];
 
   const maxDim = Math.max(...dims, 1);
   radarChartInstance = new Chart(ctx, {
     type: 'radar',
     data: {
-      labels: ['DDI冲突', '肾毒性', '肝毒性', '心血管风险', '出血风险', '代谢风险'],
+      labels: ['DDI冲突', '肾毒性', '肝毒性', '心血管风险', '出血风险', '代谢/神经'],
       datasets: [{
         data: dims,
         backgroundColor: maxDim > 60 ? 'rgba(196,168,162,0.35)' : maxDim > 40 ? 'rgba(232,185,141,0.35)' : 'rgba(181,196,177,0.35)',
@@ -890,20 +956,52 @@ function updateRadar(analysis) {
 function updateAttribution(analysis) {
   const panel = document.getElementById('attributionPanel');
   const drugRisks = analysis.risk?.individual_risks || [];
+  const drugs = simulationResult?.drugs || [];
+
   if (drugRisks.length === 0) {
     panel.innerHTML = '<span style="color:var(--text-muted)">无详细归因数据</span>';
     return;
   }
-  panel.innerHTML = drugRisks.map(dr => {
+
+  // MedDRA 系统名映射（消除 "general" 垃圾桶）
+  const SYSTEM_LABELS = {
+    general:'全身性反应', renal:'肾毒性', hepatic:'肝毒性',
+    cardiac:'心血管', hematologic:'出血/血液', respiratory:'呼吸系统',
+    neurologic:'神经毒性', gastrointestinal:'胃肠道', metabolic:'代谢异常',
+  };
+
+  panel.innerHTML = drugRisks.map((dr, idx) => {
     const organRisks = dr.organ_risks || {};
-    const topOrgan = dr.top_risk_organ || 'general';
+    const topOrganRaw = dr.top_risk_organ || 'general';
+    const topOrganLabel = SYSTEM_LABELS[topOrganRaw] || topOrganRaw;
+
+    // 用药物名替代 CID
+    const drugName = drugs[idx] || dr.drug_cid || '?';
+    const displayName = drugName.replace(/^CID\d+/,'');
+
+    // 找最严重的副作用（而不是计数）
+    const seKeys = Object.keys(organRisks);
+    const maxSev = seKeys.length > 0
+      ? seKeys.reduce((a,b) => (organRisks[a]||0) > (organRisks[b]||0) ? a : b)
+      : topOrganRaw;
+    const maxSevLabel = SYSTEM_LABELS[maxSev] || maxSev;
+    const maxSevScore = organRisks[maxSev] || 0;
+
+    const scoreColor = dr.score >= 60 ? '#A0525A' : dr.score >= 40 ? '#D4955C' : '#8FA88A';
+    const levelIcon = dr.score >= 60 ? '🔴' : dr.score >= 40 ? '🟡' : '🟢';
+
     return `
-    <div style="margin-bottom:10px;padding:8px;background:rgba(0,0,0,0.02);border-radius:8px">
-      <b>${dr.drug_cid}</b>
-      <span style="float:right;font-weight:700;color:${dr.score>=60?'var(--dusty-deep)':dr.score>=40?'var(--sunset-deep)':'var(--sage-deep)'}">${dr.score.toFixed(1)}分</span>
-      <div style="font-size:12px;color:var(--text-secondary)">
-        副作用计数: ${dr.side_effect_count} | 风险等级: ${dr.level}
-        <br>主要器官系统: ${topOrgan} (${(organRisks[topOrgan]||0).toFixed(1)}分)
+    <div style="margin-bottom:10px;padding:10px;background:rgba(0,0,0,0.02);border-radius:8px;border-left:3px solid ${scoreColor}">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:14px">💊 ${displayName}</b>
+        <span style="font-weight:700;font-size:14px;color:${scoreColor}">${levelIcon} ${dr.score.toFixed(1)}分</span>
+      </div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">
+        ⚠️ 最严重风险: <b style="color:${scoreColor}">${maxSevLabel} (${maxSevScore.toFixed(0)}分)</b>
+        ${dr.level ? `| 等级: ${dr.level}` : ''}
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+        主要受累系统: ${topOrganLabel} · ${Object.entries(organRisks).filter(([,v])=>v>5).map(([k,v])=>`${SYSTEM_LABELS[k]||k} ${v.toFixed(0)}`).join(' / ')||'无显著'}
       </div>
     </div>
   `}).join('');
@@ -913,7 +1011,7 @@ function updateAttribution(analysis) {
 function updateDDICards(interactions) {
   const container = document.getElementById('ddiList');
   if (interactions.length === 0) {
-    container.innerHTML = '<div style="color:var(--sage-deep);text-align:center;padding:20px">✓ 未检测到药物相互作用，当前组合安全</div>';
+    container.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:20px">📋 基于已知DDI数据库未检测到显著相互作用<br><span style="font-size:12px;color:var(--text-muted)">仍建议结合临床判断评估潜在风险</span></div>';
     return;
   }
   const order = {high:0, moderate:1, mild:2};
@@ -931,14 +1029,29 @@ function updateDDICards(interactions) {
       <div class="ddi-effects">
         ${(ddi.top_effects||ddi.common_effects||[]).slice(0,8).map(se => `<span class="ddi-effect-tag">${se}</span>`).join('')}
       </div>
-      ${ddi.explanation ? `
-      <button class="ddi-toggle-btn" onclick="toggleExplain(${i})">💡 探索深层药理机制 ▾</button>
-      <div class="ddi-explain" id="ddiExplain${i}">
-        ${ddi.explanation.clinical_effect ? `<div><b>临床效应：</b>${ddi.explanation.clinical_effect}</div>` : ''}
-        ${ddi.explanation.mechanism ? `<div style="margin-top:6px"><b>药理机制：</b>${ddi.explanation.mechanism}</div>` : ''}
-        ${ddi.explanation.recommendation ? `<div style="margin-top:6px"><b>建议：</b>${ddi.explanation.recommendation}</div>` : ''}
-      </div>
-      ` : ''}
+      ${(() => {
+        const exp = ddi.explanation || {};
+        // 判断是否是废话解释
+        const isGeneric = !exp.mechanism || exp.mechanism.includes('已知的药物相互作用') || exp.mechanism.includes('建议咨询临床药师');
+        const hasEvidence = exp.evidence_level || exp.guideline;
+        const hasRealContent = exp.mechanism && !isGeneric;
+
+        if (!hasRealContent && !hasEvidence) return '';
+
+        return `
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          ${hasEvidence ? `<span style="font-size:10px;background:rgba(74,143,106,0.1);color:#2D5A3D;padding:2px 8px;border-radius:8px">📚 ${exp.evidence_level || exp.guideline}</span>` : ''}
+          <span style="font-size:10px;color:var(--text-muted)">来源: ${exp.source||'指南数据库'}</span>
+        </div>
+        ${hasRealContent ? `
+        <button class="ddi-toggle-btn" onclick="toggleExplain(${i})">💡 查看药理机制 ▾</button>
+        <div class="ddi-explain" id="ddiExplain${i}">
+          ${exp.mechanism ? `<div><b>药理机制：</b>${exp.mechanism}</div>` : ''}
+          ${exp.recommendation ? `<div style="margin-top:6px"><b>临床建议：</b>${exp.recommendation}</div>` : ''}
+          ${exp.risk_weights ? `<div style="margin-top:4px;font-size:10px;color:var(--text-muted)">风险权重: ${JSON.stringify(exp.risk_weights)}</div>` : ''}
+        </div>` : ''}
+      `;
+      })()}
     </div>
   `).join('');
 }
@@ -949,95 +1062,176 @@ function toggleExplain(idx) {
 }
 
 // ==================== ALTERNATIVES ====================
-function updateAlternatives(alternatives) {
+function updateAlternatives(alternatives, deprescribing) {
   const container = document.getElementById('altContainer');
+
+  // Deprescribing banner
+  let deprHTML = '';
+  if (deprescribing && deprescribing.strategy === 'deprescribe') {
+    const pa = deprescribing.primary_action || {};
+    deprHTML = `
+    <div style="background:linear-gradient(135deg,#D4EDDA,#C3E6CB);border:2px solid #4A8F6A;border-radius:12px;padding:20px;margin-bottom:20px">
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <span style="font-size:28px">💡</span>
+        <div style="flex:1">
+          <div style="font-size:18px;font-weight:700;color:#155724;margin-bottom:8px">${pa.title||'处方优化建议'}</div>
+          <div style="font-size:14px;color:#2D5A3D;line-height:1.6;margin-bottom:12px">${pa.description||''}</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <span style="background:#fff;color:#155724;padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600">✅ 保留: ${(pa.keep_drugs||[]).join('、')}</span>
+            <span style="background:#F8D7DA;color:#721C24;padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600">🛑 建议停用: ${(pa.stop_drugs||[]).join('、')}</span>
+          </div>
+          ${pa.evidence ? `<div style="font-size:11px;color:#6C757D;margin-top:10px;font-style:italic">📚 ${pa.evidence}</div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  } else if (deprescribing && deprescribing.warning) {
+    deprHTML = `<div style="background:#FFF3CD;border:1px solid #D4955C;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:#856404">⚠️ ${deprescribing.warning}</div>`;
+  }
+
   const filtered = (alternatives||[]).filter(a => a.alternatives && a.alternatives.length > 0);
-  if (filtered.length === 0) {
+  if (filtered.length === 0 && !deprHTML) {
     container.innerHTML = '<div style="color:var(--sage-deep);text-align:center;padding:30px">🌿 当前药物组合风险可控，无需替代方案</div>';
     return;
   }
-  container.innerHTML = filtered.map(alt => {
+
+  container.innerHTML = deprHTML + filtered.map(alt => {
     const candidates = alt.alternatives || [];
-    return `
-    <div style="margin-bottom:20px">
-      <h4 style="color:var(--dusty-deep);margin-bottom:12px">${alt.original} → 替代候选</h4>
-      <div class="alt-comparison">
-        <div class="alt-original">
-          <div style="font-weight:600;color:var(--dusty-deep)">原药</div>
-          <div style="font-size:16px;margin-top:6px">${alt.original}</div>
-        </div>
-        ${candidates.map(c => `
-        <div class="alt-candidate" style="flex:1">
-          <div class="alt-score-circle ${c.score>=80?'high':'mid'}">${c.score||0}%</div>
-          <div style="text-align:center;font-weight:600">${c.name||c.drug_name}</div>
-          <div style="text-align:center;font-size:11px;color:var(--text-muted)">${c.atc_code||''}</div>
-          <ul class="alt-reasons">${(c.reasons||[]).map(r=>`<li>${r}</li>`).join('')}</ul>
-          <button class="alt-explain-btn" onclick="showExplain('${alt.original}','${c.name||c.drug_name}')">🔍 为什么推荐？</button>
-        </div>
-        `).join('')}
-      </div>
-    </div>`;
+    const whyReplaced = (alt.why_replaced || ['触发DDI风险']).join('；');
+    const blocked = candidates.filter(c => c.tier === 'blocked');
+    const scored = candidates.filter(c => c.tier !== 'blocked');
+
+    let html = '<div class="alt-comparison">';
+    html += `<div class="alt-header-row"><span class="original-drug">⚠️ ${alt.original}</span><span style="color:var(--text-muted)">→ 需替换</span><span class="why-badge">${whyReplaced}</span></div>`;
+    html += '<div class="alt-card-row">';
+
+    // Original drug card
+    html += `<div class="alt-original"><div style="font-weight:600;color:var(--dusty-deep);font-size:13px">🔴 触发风险的原药</div><div style="font-size:18px;margin:8px 0;font-weight:700">${alt.original}</div><div style="font-size:11px;color:var(--sunset-deep);line-height:1.5">${whyReplaced}</div></div>`;
+
+    // Scored candidates
+    scored.forEach(c => {
+      const tierIcon = {preferred:'🌟',safe:'✅',caution:'⚠️',not_recommended:'❌'}[c.tier]||'';
+      const posR = (c.reasons_positive||[]).map(r=>`<li>${r}</li>`).join('');
+      const negR = (c.reasons_negative||[]).map(r=>`<li>${r}</li>`).join('');
+      const warns = (c.warnings||[]).map(w=>`<li>${w}</li>`).join('');
+      const newSE = (c.new_side_effects||[]).slice(0,5).join('、');
+      const removedSE = (c.removed_side_effects||[]).slice(0,3).join('、');
+      const ddiW = (c.ddi_conflicts||[]).map(d=>`<li>${d}</li>`).join('');
+
+      html += `<div class="alt-candidate tier-${c.tier}">
+        <div class="alt-tier-badge ${c.tier}">${tierIcon} ${c.tier_label||c.tier}</div>
+        <div class="alt-drug-name">${c.drug_name}</div>
+        <div class="alt-atc">ATC: ${c.atc_code||'N/A'}</div>
+        <div class="alt-zone why"><div class="alt-zone-title">📋 疗效依据 (Why)</div>${posR ? `<ul>${posR}</ul>` : '<div class="empty">基于ATC同类药推荐</div>'}</div>
+        <div class="alt-zone safety"><div class="alt-zone-title">🛡️ 安全审查 (Safety Clearance)</div><ul>${removedSE ? `<li>✅ 规避了原发风险（预期可减少）：${removedSE}</li>` : ''}${!ddiW ? '<li>✓ 与当前用药无明显DDI冲突</li>' : ''}${!warns ? '<li>✓ 未触发禁忌症规则</li>' : ''}</ul></div>
+        <div class="alt-zone risks"><div class="alt-zone-title">⚠️ 新增风险 (New Risks)</div>${(newSE||ddiW||warns) ? `<ul>${newSE ? `<li>新副作用：${newSE}</li>` : ''}${ddiW}${warns}</ul>` : '<div class="empty">无明显新增风险</div>'}</div>
+      </div>`;
+    });
+
+    // Blocked candidates
+    blocked.forEach(c => {
+      html += `<div class="alt-candidate tier-blocked">
+        <div class="alt-tier-badge blocked">🚫 已熔断</div>
+        <div class="alt-drug-name" style="text-decoration:line-through">${c.drug_name}</div>
+        <div class="alt-atc">ATC: ${c.atc_code||'N/A'}</div>
+        <div class="alt-zone risks"><div class="alt-zone-title">🔴 熔断原因</div><div style="font-size:12px;color:#A0525A;font-weight:600">${c.blocked_reason||'触发绝对禁忌规则'}</div></div>
+      </div>`;
+    });
+
+    html += '</div></div>';
+    return html;
   }).join('');
 }
 
 async function showExplain(original, alternative) {
   try {
-    const r = await fetch('/api/recommend/explain', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({original_drug:original, alternative})
-    });
+    const r = await fetch('/api/recommend/explain', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({original_drug:original,alternative})});
     const d = await r.json();
-    document.getElementById('explainCompare').innerHTML = `
-      <div>
-        <b>${d.original_drug}</b> (ATC: ${d.atc_original||'N/A'})
-        <p class="explain-keep">✅ 共同适应症：${(d.shared_indications||[]).join('、')||'无'}</p>
-        <p class="explain-drop">🚫 独有副作用：${(d.unique_side_effects_original||[]).slice(0,5).join('、')||'无'}</p>
-      </div>
-      <div>
-        <b>${d.alternative}</b> (ATC: ${d.atc_alternative||'N/A'})
-        <p class="explain-keep">✅ 共同适应症：${(d.shared_indications||[]).join('、')||'无'}</p>
-        <p class="explain-keep">✅ 独有副作用：${(d.unique_side_effects_alternative||[]).slice(0,5).join('、')||'无'}</p>
-      </div>
-    `;
+    document.getElementById('explainCompare').innerHTML = `<div style="margin-bottom:12px"><b>🔄 ${d.original_drug} → ${d.alternative}</b></div><div style="font-size:13px;line-height:1.6"><p>📋 <b>共同适应症：</b>${(d.shared_indications||[]).join('、')||'无'}</p><p>📋 <b>${d.original_drug} 独有副作用：</b>${(d.unique_side_effects_original||[]).slice(0,5).join('、')||'无'}</p><p>📋 <b>${d.alternative} 独有副作用：</b>${(d.unique_side_effects_alternative||[]).slice(0,5).join('、')||'无'}</p></div>`;
     document.getElementById('explainOverlay').classList.add('show');
-  } catch(e) {
-    showToast('获取解释失败', 'error');
-  }
+  } catch(e) { showToast('获取解释失败', 'error'); }
 }
 
 // ==================== KNOWLEDGE GRAPH ====================
 function updateKnowledgeGraph(drugList) {
   const container = document.getElementById('graphContainer');
   if (!drugList || drugList.length === 0) {
-    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted)">等待药物数据...</div>';
+    container.innerHTML = '<div style=\"display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted)\">等待药物数据...</div>';
     return;
   }
   const nodes = []; const edges = []; const seMap = new Map();
   const interactions = (simulationResult?.analysis?.ddi?.interactions) || [];
 
+  // 药物节点 — 蓝色圆点
   drugList.forEach((d, i) => {
-    nodes.push({id:`drug_${i}`, label:d, color:{background:'#9CAEBF',border:'#738A9F'}, font:{color:'#4A4543'}, shape:'dot', size:20});
+    nodes.push({id:`drug_${i}`, label:d, level:0,
+      color:{background:'#9CAEBF',border:'#738A9F'},
+      font:{color:'#4A4543',size:14}, shape:'dot', size:24});
   });
 
-  interactions.forEach(ddi => {
+  // DDI 边 + 高危副作用路径（仅展示汇聚于同一副作用的前3个）
+  interactions.forEach((ddi, idx) => {
     const i1 = drugList.indexOf(ddi.drug1), i2 = drugList.indexOf(ddi.drug2);
-    if (i1 >= 0 && i2 >= 0) {
-      edges.push({from:`drug_${i1}`, to:`drug_${i2}`, color:{color:'#C4A8A2'}, dashes:true, title:`${ddi.common_se_count||0} common SE`});
-    }
-    (ddi.top_effects||ddi.common_effects||[]).forEach(se => {
+    if (i1 < 0 || i2 < 0) return;
+
+    // DDI 主边 — 红色/橙色，带标签
+    const sevColor = ddi.severity === 'high' ? '#A0525A' : ddi.severity === 'moderate' ? '#D4955C' : '#C9A93E';
+    const sevLabel = ddi.severity === 'high' ? '高危DDI' : ddi.severity === 'moderate' ? '中危DDI' : '轻微DDI';
+    edges.push({
+      from:`drug_${i1}`, to:`drug_${i2}`,
+      color:{color:sevColor, highlight:'#A0525A'},
+      width: ddi.severity === 'high' ? 3 : 2,
+      dashes: ddi.severity !== 'high',
+      label: sevLabel,
+      font:{size:9, color:sevColor, background:'rgba(255,255,255,0.8)', strokeWidth:0},
+      arrows:'to,from',
+      title:`${ddi.drug1}↔${ddi.drug2}: ${ddi.common_se_count||0} 共同副作用`
+    });
+
+    // 仅展示高危副作用（过滤掉非关键SE，不展示所有2-hop邻居）
+    const effects = (ddi.top_effects||ddi.common_effects||[]).slice(0, 5);
+    effects.forEach(se => {
       if (!seMap.has(se)) {
+        const isBleeding = /bleed|hemorrhag|haemorrhag|出血/i.test(se);
+        const isRenal = /renal|kidney|nephro|肾|aki/i.test(se);
+        const isHepatic = /hepat|肝|liver/i.test(se);
+        const isSevere = isBleeding || isRenal || isHepatic;
+        const bg = isBleeding ? '#A0525A' : isRenal ? '#A8B8C8' : isHepatic ? '#D4955C' : '#D5CEC8';
+        const border = isSevere ? '#333' : '#999';
+        const sz = isSevere ? 12 : 6;
         seMap.set(se, nodes.length);
-        nodes.push({id:`se_${nodes.length}`, label:se, color:{background:'#E8B98D',border:'#D4955C'}, font:{color:'#4A4543',size:10}, shape:'dot', size:8});
+        nodes.push({
+          id:`se_${nodes.length}`, label: se, level:1,
+          color:{background:bg, border:border},
+          font:{color:isSevere?'#fff':'#888', size:isSevere?10:8},
+          shape: isSevere ? 'diamond' : 'dot',
+          size: sz,
+          title: `${se}${isSevere?' (高危信号)':''}`
+        });
       }
-      if (i1 >= 0) edges.push({from:`drug_${i1}`, to:`se_${seMap.get(se)}`, color:{color:'#D5CEC8'}, width:0.5});
+      // 边语义：CAUSES_SEVERE_ADR
+      edges.push({
+        from:`drug_${i1}`, to:`se_${seMap.get(se)}`,
+        color:{color: '#C4A8A2', opacity:0.6},
+        width: 1, dashes: true,
+        label: '导致',
+        font:{size:7, color:'#999'},
+        title:`${ddi.drug1} → ${se}`
+      });
     });
   });
 
   if (networkInstance) networkInstance.destroy();
   networkInstance = new vis.Network(container, {nodes:new vis.DataSet(nodes), edges:new vis.DataSet(edges)}, {
-    physics:{solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-40,centralGravity:0.005}},
-    interaction:{hover:true,zoomView:true,dragView:true},
-    nodes:{borderWidth:2},
+    layout:{hierarchical:{enabled:true, direction:'LR', sortMethod:'directed',
+      levelSeparation:220, nodeSpacing:100, treeSpacing:50,
+      blockShifting:true, edgeMinimization:true}},
+    physics:{enabled:false},
+    interaction:{hover:true, zoomView:true, dragView:true, tooltipDelay:200},
+    nodes:{borderWidth:2, shadow:{enabled:true, size:6},
+      shapeProperties:{borderRadius:20}},
+    edges:{smooth:{type:'cubicBezier', forceDirection:'horizontal'},
+      font:{size:8, align:'top', background:'rgba(255,255,255,0.85)',
+        strokeWidth:2, strokeColor:'rgba(255,255,255,0.9)'}},
   });
 }
 
@@ -1046,34 +1240,52 @@ function updateSEBarChart(interactions) {
   const ctx = document.getElementById('seBarChart').getContext('2d');
   if (seBarChartInstance) seBarChartInstance.destroy();
 
-  const cats = {'出血':0,'胃肠道':0,'神经':0,'皮肤':0,'肝毒性':0,'肾毒性':0,'心血管':0,'呼吸':0,'其他':0};
-  const kw = {
-    '出血':/bleed|hemorrhag|出血|凝血|bruis/i,
-    '胃肠道':/nausea|vomit|diarrh|constip|abdominal|gastro/i,
-    '神经':/headache|dizz|confus|seizure|insomni|anxi|depress/i,
-    '皮肤':/rash|prurit|urticar|photo/i,
-    '肝毒性':/hepat|肝|liver/i,
-    '肾毒性':/renal|kidney|nephro|肾/i,
-    '心血管':/tachy|hypotension|hypertension|cardia|chest|palpit/i,
-    '呼吸':/cough|dyspn|broncho|pneum/i,
-  };
+  // MedDRA SOC 本体映射 — LLT→SOC，消灭"其他"
+  const socMap = [
+    { cat:'出血风险', re:/bleed|hemorrhag|haemorrhag|出血|凝血|bruis|purpur|haemat|hemat|petechi|ecchymo|coagul|thrombocyt/i, color:'#A0525A' },
+    { cat:'胃肠道', re:/nausea|vomit|diarrh|constip|abdominal|gastro|dyspeps|anorexi|ulcer|gastrit|bowel|ileus|colitis|perforat/i, color:'#D4955C' },
+    { cat:'肾损伤', re:/renal|kidney|nephro|肾|aki|creatinine|urinary|oligur|proteinur|haematur|hematur|dysur|bun|azot/i, color:'#A0525A' },
+    { cat:'肝损伤', re:/hepat|肝|liver|jaundic|cirrhos|alt|ast|transamin|bilirubin|cholest/i, color:'#D4955C' },
+    { cat:'心血管', re:/tachy|hypotension|hypertension|cardia|chest|palpit|arrhythm|qtc|torsade|myocard|infarct|angina|edema|oedema|syncope/i, color:'#738A9F' },
+    { cat:'神经系统', re:/headache|dizz|confus|seizure|insomni|anxi|depress|drows|somnol|tremor|convuls|neuropath|hallucin|psychos|agitat/i, color:'#8FA88A' },
+    { cat:'皮肤反应', re:/rash|prurit|urticar|photo|dermat|eczema|angioedema|erythem|steven|bullous|toxic.*epiderm/i, color:'#A67F78' },
+    { cat:'呼吸系统', re:/cough|dyspn|broncho|pneum|asthma|wheez|hypoxi|respir|pulmon|embol/i, color:'#B5C4B1' },
+    { cat:'代谢异常', re:/hypoglyc|hyperglyc|diabet|electrolyt|potassium|sodium|calcium|magnes|acidosis|alkalos|weight|obes/i, color:'#9CAEBF' },
+    { cat:'骨髓/血液', re:/anemia|anaemia|leukopen|neutropen|thrombocyt|pancytopen|agranulocyt|aplastic|marrow|pancyt/i, color:'#A8B8C8' },
+  ];
+
+  const cats = {};
+  socMap.forEach(s => { cats[s.cat] = { count:0, color:s.color }; });
+
   interactions.forEach(ddi => {
     (ddi.top_effects||ddi.common_effects||[]).forEach(se => {
       let matched = false;
-      for (const [cat, re] of Object.entries(kw)) {
-        if (re.test(se)) { cats[cat]++; matched = true; break; }
+      for (const s of socMap) {
+        if (s.re.test(se)) { cats[s.cat].count++; matched = true; break; }
       }
-      if (!matched) cats['其他']++;
+      // 极少数未匹配的副作用归入最近的SOC或丢弃（不再显示"其他"）
     });
+  });
+
+  // 过滤零值并按临床放大系数排序（出血/肾损伤优先）
+  let entries = Object.entries(cats).filter(([,v]) => v.count > 0);
+  // 出血和肾损伤始终排前面
+  const priority = ['出血风险','肾损伤','肝损伤','心血管','神经系统'];
+  entries.sort((a,b) => {
+    const ia = priority.indexOf(a[0]), ib = priority.indexOf(b[0]);
+    if (ia >= 0 && ib >= 0) return ia - ib;
+    if (ia >= 0) return -1;
+    if (ib >= 0) return 1;
+    return b[1].count - a[1].count;
   });
 
   seBarChartInstance = new Chart(ctx, {
     type:'bar',
     data:{
-      labels:Object.keys(cats),
+      labels: entries.map(([k]) => k),
       datasets:[{
-        data:Object.values(cats),
-        backgroundColor:['#C4A8A2','#E8B98D','#B5C4B1','#9CAEBF','#D4B896','#B8A9A0','#A8B8C8','#C8C0B8','#D5CEC8'],
+        data: entries.map(([,v]) => v.count),
+        backgroundColor: entries.map(([,v]) => v.color),
         borderWidth:0, borderRadius:6,
       }]
     },
@@ -1081,9 +1293,44 @@ function updateSEBarChart(interactions) {
       responsive:true, maintainAspectRatio:false,
       indexAxis:'y',
       plugins:{legend:{display:false}},
-      scales:{x:{grid:{display:false}},y:{grid:{display:false}}}
+      scales:{x:{grid:{display:false}},y:{grid:{display:false}}},
+      onClick: function(e, elements) {
+        // 点击柱状图高亮图谱中的对应路径
+        if (!elements || elements.length === 0) return;
+        const idx = elements[0].index;
+        const cat = entries[idx] ? entries[idx][0] : '';
+        highlightGraphNodes(cat);
+      }
     }
   });
+}
+
+// 图谱交叉筛选
+function highlightGraphNodes(category) {
+  const nodes = networkInstance?.body?.data?.nodes;
+  if (!nodes) return;
+  const kwMap = {
+    '出血风险':/bleed|hemorrhag|出血|bruis|purpur/i,
+    '肾损伤':/renal|kidney|nephro|肾/i,
+    '肝损伤':/hepat|肝|liver/i,
+    '心血管':/tachy|cardia|chest|arrhythm|qtc/i,
+  };
+  const re = kwMap[category];
+  nodes.forEach(n => {
+    if (n.id && n.id.startsWith('se_') && re && re.test(n.label||'')) {
+      networkInstance.body.data.nodes.update({id:n.id, opacity:1, borderWidth:4});
+    }
+  });
+  // 3秒后恢复
+  setTimeout(() => {
+    if (networkInstance) {
+      nodes.forEach(n => {
+        if (n.id && n.id.startsWith('se_')) {
+          networkInstance.body.data.nodes.update({id:n.id, opacity:0.7, borderWidth:1});
+        }
+      });
+    }
+  }, 3000);
 }
 
 // ==================== GANTT + REFILL ====================

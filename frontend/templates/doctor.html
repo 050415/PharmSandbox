@@ -86,7 +86,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei
     <div class="stat"><div class="n" id="statTotal">10</div><div class="l">待诊患者</div></div>
     <div class="stat"><div class="n" id="statHigh" style="color:var(--dusty-deep)">5</div><div class="l">高危拦截</div></div>
     <div class="stat"><div class="n" id="statRefill" style="color:var(--sunset-deep)">3</div><div class="l">续方申请</div></div>
-    <div class="stat"><div class="n" id="statDone" style="color:var(--sage-deep)">0</div><div class="l">已处理</div></div>
+    <div class="stat" onclick="resetProcessed()" title="点击重置已处理状态"><div class="n" id="statDone" style="color:var(--sage-deep);cursor:pointer">0</div><div class="l">已处理 ↺</div></div>
   </div>
 </div>
 
@@ -207,12 +207,21 @@ function renderDetail() {
     <h4 style="font-size:12px;color:var(--text-secondary);margin:8px 0">化验指标 <span style="font-weight:400;font-size:10px;color:var(--text-muted)">· MIMIC-IV</span></h4>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
       ${Object.entries(labs).map(([k,v]) => {
-        const label = {creatinine:'肌酐',alt:'ALT',bun:'BUN',inr:'INR'}[k]||k;
-        const unit = {creatinine:'μmol/L',alt:'U/L',bun:'mmol/L',inr:''}[k]||'';
-        const high = (k==='creatinine'&&v>130)||(k==='alt'&&v>60)||(k==='bun'&&v>12)||(k==='inr'&&v>2.5);
-        return `<div style="text-align:center;padding:10px 6px;border-radius:10px;background:${high?'#fdf2f2':'rgba(0,0,0,0.02)'};border:1px solid ${high?'rgba(166,80,90,0.25)':'rgba(0,0,0,0.04)'};transition:all 0.3s">
-          <div class="val" id="lab-${k}" style="font-size:20px;font-weight:700;color:${high?'var(--dusty-deep)':'var(--text-primary)'}">${v}</div>
-          <div style="font-size:10px;color:${high?'var(--dusty-deep)':'var(--text-muted)'}">${label} <span style="font-size:9px">${unit}</span></div>
+        const meta = {
+          creatinine: {label:'血肌酐 Cr', unit:'μmol/L', ref:'44-133', desc:'肾功能核心指标，升高提示肾损伤'},
+          alt: {label:'谷丙转氨酶 ALT', unit:'U/L', ref:'7-40', desc:'肝细胞损伤标志物'},
+          bun: {label:'尿素氮 BUN', unit:'mmol/L', ref:'2.9-8.2', desc:'肾排泄功能指标，与肌酐联合评估'},
+          inr: {label:'凝血INR', unit:'', ref:'0.8-1.2(常)/2.0-3.0(抗凝)', desc:'华法林抗凝达标范围2.0-3.0'},
+        }[k]||{label:k,unit:'',ref:'',desc:''};
+        const high = (k==='creatinine'&&v>130)||(k==='alt'&&v>60)||(k==='bun'&&v>12)||(k==='inr'&&(v>3.0||v<2.0));
+        const inrTarget = k==='inr'&&v>=2.0&&v<=3.0;
+        const color = inrTarget ? '#155724' : (high ? 'var(--dusty-deep)' : 'var(--text-primary)');
+        const bg = inrTarget ? '#d4edda' : (high ? '#fdf2f2' : 'rgba(0,0,0,0.02)');
+        const border = inrTarget ? 'rgba(74,143,106,0.5)' : (high ? 'rgba(166,80,90,0.25)' : 'rgba(0,0,0,0.04)');
+        return `<div style="text-align:center;padding:10px 6px;border-radius:10px;background:${bg};border:2px solid ${border};transition:all 0.3s" title="${meta.desc}">
+          <div class="val" id="lab-${k}" style="font-size:20px;font-weight:700;color:${color}">${v}${inrTarget?' ✓':''}</div>
+          <div style="font-size:11px;font-weight:600;color:${color}">${meta.label}</div>
+          <div style="font-size:9px;color:${inrTarget?'#2D5A3D':(high?'var(--dusty-deep)':'var(--text-muted)')}">正常: ${meta.ref}</div>
         </div>`;
       }).join('')}
     </div>
@@ -261,6 +270,14 @@ function quickProcess() {
   renderQueue();
   renderDetail();
   showToast(`${selectedPatient.name} 已标记为已处理`, 'success');
+}
+
+function resetProcessed() {
+  processedSet.clear();
+  localStorage.removeItem('pharmsandbox_processed');
+  renderQueue();
+  renderDetail();
+  showToast('已重置所有患者处理状态', 'success');
 }
 
 async function refreshLabs() {

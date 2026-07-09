@@ -118,9 +118,11 @@ const patient = JSON.parse(localStorage.getItem('pharmsandbox_active_patient')||
 const hasPatient = patient.id;
 const patientName = patient.name||'患者';
 const patientDrugs = patient.drugs||['未知药物'];
+const prescriptions = patient.prescriptions||[];
 const drugA = patientDrugs[0]||'药物A';
 const drugB = patientDrugs.length>1 ? patientDrugs[1] : (patientDrugs[0]||'药物B');
 let chatStarted = false;
+const doseLog = JSON.parse(localStorage.getItem('pharmsandbox_dose_log')||'{}'); // 服药记录
 
 // ==================== INIT ====================
 document.addEventListener('DOMContentLoaded', () => {
@@ -132,37 +134,142 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   document.getElementById('headerAvatar').textContent = patientName[0]||'?';
   document.getElementById('headerName').textContent = `${patientName} 的用药助手`;
-  renderProgress();
+
+  // 从API拉最新处方（解决localStorage旧数据无prescriptions的问题）
+  fetch(`/api/ehr/patient/${patient.id}`).then(r=>r.json()).then(d=>{
+    if(d.patient&&d.patient.prescriptions){prescriptions.length=0;prescriptions.push(...d.patient.prescriptions);}
+  }).finally(()=>renderProgress());
+
+  if (prescriptions.length===0) renderProgress(); // 立即渲染避免闪烁
+  // 监听续方天数的实时变化（沙盘推演调整时自动同步）
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'pharmsandbox_active_patient') renderProgress();
+  });
   // Initial greeting
   setTimeout(() => {
     addMessage(`<b>${patientName}您好！</b>我是 PharmSandbox 智能用药助手。<br><br>我正在通过 GNN 知识图谱实时监测您的用药安全。您正在服用 <b>${drugA}</b>${drugB!==drugA?` 和 <b>${drugB}</b>`:''}，对吗？<br><br>最近服药后有没有出现以下不适？`,'assistant');
-    renderQuickReplies(['有点水肿/乏力 😣','没有不适，挺好的 ✅','关节/肌肉有些疼痛'],'init');
+    renderQuickReplies(['💊 已服药（记录时间）','📋 查看用药时刻表','有点不适 😣','目前还好 ✅'],'init');
     chatStarted = true;
   }, 600);
 });
 
 // ==================== PROGRESS RING ====================
 function renderProgress() {
-  const remainingDays = 2 + Math.floor(Math.random() * 6);
+  const ehrData = JSON.parse(localStorage.getItem('pharmsandbox_active_patient')||'{}');
+  const remainingDays = ehrData.refill_days || (2 + Math.floor(Math.random() * 6));
+  const isHighRisk = ehrData.status === 'high_risk';
   const urgent = remainingDays <= 4;
-  const pct = remainingDays / 30;
-  const circ = 2 * Math.PI * 32;
+  const now = new Date();
+  const currentTime = now.getHours() + ':' + String(now.getMinutes()).padStart(2,'0');
+
+  // 高危处方警告
+  if (isHighRisk) {
+    document.getElementById('progressArea').innerHTML = `
+      <div style="background:linear-gradient(135deg,#F8D7DA,#F5C6CB);border:2px solid #A0525A;border-radius:12px;padding:14px;width:100%">
+        <div style="font-size:13px;font-weight:700;color:#721C24;margin-bottom:6px">🚨 高危处方警示</div>
+        <div style="font-size:11px;color:#A0525A;line-height:1.6;margin-bottom:8px">
+          您目前的处方存在<b>严重药物相互作用风险</b>（${ehrData.summary||'高危DDI组合'}）。<br>
+          医生已被告知此风险，但处方可能因特殊治疗需要而保留。
+        </div>
+        <div style="background:rgba(255,255,255,0.6);border-radius:8px;padding:8px 10px;font-size:10px;color:#721C24">
+          ⚠️ <b>出现以下症状请立即就医：</b><br>
+          · 黑便/柏油样便 · 牙龈/鼻腔不明出血 · 皮肤不明瘀斑 · 血尿 · 呕血
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          ${prescriptions.map(p => `<span style="background:#fff;color:#A0525A;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:600">💊 ${p.drug} ${p.dose}${p.unit} · ${p.time}</span>`).join('')}
+        </div>
+      </div>`;
+    return;
+  }
+
+  // 正常处方的用药时刻表
+  let scheduleHTML = '';
+  if (prescriptions.length > 0) {
+    scheduleHTML += '<div style="font-size:10px;color:var(--text-muted);margin:6px 0 2px">今日用药计划</div>';
+    scheduleHTML += prescriptions.map(p => {
+      const times = (p.time||'').split(',');
+      const nextDose = findNextDose(times);
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11px">
+        <span><b>${p.drug}</b> ${p.dose}${p.unit}</span>
+        <span style="color:${nextDose ? 'var(--dusty-blue-deep)' : 'var(--text-muted)'}">${p.freq==='qd'?'每日1次':p.freq==='bid'?'每日2次':p.freq==='tid'?'每日3次':p.freq} · ${p.time}</span>
+      </div>`;
+    }).join('');
+  }
+
   document.getElementById('progressArea').innerHTML = `
-    <svg width="76" height="76" viewBox="0 0 76 76">
-      <circle cx="38" cy="38" r="32" fill="none" stroke="#e8e3dd" stroke-width="5"/>
-      <circle cx="38" cy="38" r="32" fill="none" stroke="${urgent?'#C4A8A2':'#8FA88A'}" stroke-width="5"
-        stroke-dasharray="${(pct*circ).toFixed(0)} ${circ}" stroke-linecap="round"
-        transform="rotate(-90 38 38)" style="transition:all 0.5s ease"/>
-      <text x="38" y="36" text-anchor="middle" font-size="20" fill="${urgent?'#A67F78':'#4A4543'}" font-weight="700">${remainingDays}</text>
-      <text x="38" y="48" text-anchor="middle" font-size="7" fill="#8A827E">剩余天数</text>
-    </svg>
-    <div class="progress-info">
-      <div class="prog-title">${urgent?'⚠️ 需续方关注':'✅ 用药正常'}</div>
-      <div class="prog-detail">
-        💊 <b>${drugA}</b> | 💊 <b>${drugB}</b><br>
-        ${urgent?`<span class="warn">⚠ 仅剩 ${remainingDays} 天用量</span>`:'<span style="color:var(--sage-deep)">✓ 药物余量充足</span>'}
+    <div style="display:flex;align-items:flex-start;gap:10px;width:100%">
+      <svg width="50" height="50" viewBox="0 0 66 66" style="flex-shrink:0">
+        <circle cx="33" cy="33" r="28" fill="none" stroke="#e8e3dd" stroke-width="4"/>
+        <circle cx="33" cy="33" r="28" fill="none" stroke="${urgent?'#C4A8A2':'#8FA88A'}" stroke-width="4"
+          stroke-dasharray="${(remainingDays/30*2*Math.PI*28).toFixed(0)} ${2*Math.PI*28}" stroke-linecap="round"
+          transform="rotate(-90 33 33)"/>
+        <text x="33" y="31" text-anchor="middle" font-size="18" fill="${urgent?'#A67F78':'#4A4543'}" font-weight="700">${remainingDays}</text>
+        <text x="33" y="42" text-anchor="middle" font-size="6" fill="#8A827E">天剩余</text>
+      </svg>
+      <div style="flex:1;min-width:0">
+        <div class="prog-title">${urgent?'⚠️ 需续方':'✅ 用药中'}</div>
+        <div style="font-size:11px;color:var(--text-muted)">
+          ${remainingDays <= 4 ? `<span class="warn">仅剩${remainingDays}天</span>` : `余量${remainingDays}天`} · ${prescriptions.length}种药
+        </div>
+        ${scheduleHTML}
       </div>
     </div>`;
+}
+
+// 找下一个服药时间
+function findNextDose(times) {
+  const now = new Date();
+  const currentMin = now.getHours() * 60 + now.getMinutes();
+  for (const t of times) {
+    const [h, m] = (t.trim()).split(':').map(Number);
+    if (!isNaN(h) && !isNaN(m)) {
+      const doseMin = h * 60 + m;
+      if (doseMin >= currentMin && doseMin <= currentMin + 30) return true; // 当前半小时内
+    }
+  }
+  return false;
+}
+
+// ==================== 重复用药检测 ====================
+function logDose(drug, time) {
+  const key = `${drug}_${new Date().toDateString()}`;
+  doseLog[key] = (doseLog[key] || []).concat(time);
+  localStorage.setItem('pharmsandbox_dose_log', JSON.stringify(doseLog));
+  checkDuplicateDose(drug);
+}
+
+function checkDuplicateDose(drug) {
+  const today = new Date().toDateString();
+  const doses = Object.entries(doseLog)
+    .filter(([k]) => k.startsWith(drug+'_') && k.includes(today))
+    .flatMap(([,v]) => v);
+
+  if (doses.length >= 2) {
+    const last = doses[doses.length-1];
+    const prev = doses[doses.length-2];
+    const diff = Math.abs(new Date(last) - new Date(prev)) / 60000; // 分钟
+    if (diff < 240) { // 4小时内
+      showToast(`⚠️ 警告：${drug} 距上次服药仅 ${Math.round(diff)} 分钟，请勿在4小时内重复服用！`, 5000);
+      addSystemMsg(`🚨 <b>重复用药警告</b>：${drug} 在 ${Math.round(diff)} 分钟内被服用两次。根据处方计划请间隔至少4小时。`);
+    }
+  }
+}
+
+// ==================== 处方时刻表卡片 ====================
+function showMedSchedule() {
+  if (prescriptions.length === 0) {
+    addMessage('暂无处方数据，请联系医生获取完整处方信息。', 'assistant');
+    return;
+  }
+  let html = '<b>📋 您的用药时刻表</b><br><br>';
+  prescriptions.forEach(p => {
+    html += `<b>💊 ${p.drug} ${p.dose}${p.unit}</b><br>
+      ⏰ ${p.freq==='qd'?'每日1次':p.freq==='bid'?'每日2次':p.freq==='tid'?'每日3次':p.freq==='qw'?'每周1次':p.freq=== 'prn'?'必要时':p.freq} · ${p.time}<br>
+      📝 ${p.note||''}<br>
+      剩余 ${p.duration||'?'} 天<br><br>`;
+  });
+  html += '<span style="font-size:10px;color:var(--text-muted)">💡 点击下方"已服药"按钮记录每次用药</span>';
+  addMessage(html, 'assistant');
 }
 
 // ==================== MESSAGE HELPERS ====================
@@ -289,6 +396,38 @@ function renderQuickReplies(replies, context) {
 
 // ==================== 4-STEP CINEMATIC FLOW ====================
 function handleReply(text, ctx) {
+  // 用药管理功能
+  if (text.includes('已服药')) {
+    const now = new Date();
+    const timeStr = now.getHours().toString().padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+    addMessage(`已记录服药时间：${timeStr}`, 'user');
+    // 记录每种药物的最后服用时间
+    prescriptions.forEach(p => logDose(p.drug, new Date().toISOString()));
+    setTimeout(() => {
+      let msg = `✅ 用药已记录！<br><br><b>今日用药进度：</b><br>`;
+      const today = new Date().toDateString();
+      prescriptions.forEach(p => {
+        const key = `${p.drug}_${today}`;
+        const taken = (doseLog[key]||[]).length;
+        const total = p.freq==='qd'?1:p.freq==='bid'?2:p.freq==='tid'?3:1;
+        const icon = taken >= total ? '✅' : '⏳';
+        msg += `${icon} ${p.drug}: ${taken}/${total} 次 · ${p.dose}${p.unit}<br>`;
+      });
+      msg += `<br><span style="font-size:10px;color:var(--text-muted)">下次请按时服药，避免漏服或重复服用</span>`;
+      addMessage(msg, 'assistant');
+      renderQuickReplies(['💊 已服药（记录时间）','📋 查看用药时刻表','目前还好 ✅'],'init');
+      renderProgress();
+    }, 400);
+    return;
+  }
+
+  if (text.includes('用药时刻表')) {
+    addSystemMsg('— 正在加载处方数据 —');
+    setTimeout(() => showMedSchedule(), 300);
+    renderQuickReplies(['💊 已服药（记录时间）','查看我的用药报告','目前还好 ✅'],'init');
+    return;
+  }
+
   if (/肿|乏力/.test(text) && !/没有/.test(text)) {
     // ====== STEP 1: Natural language安抚+药理解析 ======
     setTimeout(() => {

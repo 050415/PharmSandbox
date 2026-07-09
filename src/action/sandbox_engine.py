@@ -44,6 +44,18 @@ class SandboxEngine:
 
         self.risk_scorer = RiskScorer(data_root, drug_se_map=drug_se_map, lab_loader=lab_loader)
 
+        # 初始化 API 安检门 + 发言人（免费外部API，失败不影响核心功能）
+        self.api_gate = None
+        self.api_explainer = None
+        try:
+            from src.decision.api_gate import APIGate
+            from src.decision.api_explainer import APIExplainer
+            self.api_gate = APIGate()
+            self.api_explainer = APIExplainer()
+            print("  [OK] API Gate + Explainer loaded (FDA/PubMed)")
+        except Exception as e:
+            print(f"  [WARN] API modules: {e}")
+
         # 尝试加载LLM推理器和NER
         try:
             from src.decision.llm_reasoner import MedicalReasoner
@@ -56,7 +68,7 @@ class SandboxEngine:
 
         try:
             from src.perception.ner.drug_ner import DrugNER
-            self.ner = DrugNER(str(data_root / "sider" / "drug_names.tsv"))
+            self.ner = DrugNER(str(self.data_root / "sider" / "drug_names.tsv"))
             print("  [OK] NER drug recognition module loaded")
         except Exception as e:
             self.ner = None
@@ -199,9 +211,14 @@ class SandboxEngine:
         return {'drugs': [], 'conditions': [], 'dosages': []}
 
     def _drug_name_to_cid(self, drug_name: str) -> str:
-        """将药物名转换为 SIDER CID（O(1) 字典查表）"""
+        """将药物名转换为 SIDER CID（O(1)字典查表 + 同义词回退）"""
         self.recommender._load_data()
-        cid = self.recommender._name_to_cid.get(drug_name.lower())
+        name_lower = drug_name.lower()
+        cid = self.recommender._name_to_cid.get(name_lower)
+        if cid is None:
+            synonym = self.recommender.SYNONYM_MAP.get(name_lower)
+            if synonym:
+                cid = self.recommender._name_to_cid.get(synonym)
         return str(cid) if cid else drug_name
 
     def _gnn_predict_ddi(self, drug1: str, drug2: str):
@@ -267,28 +284,36 @@ class SandboxEngine:
         Returns:
             完整推演结果
         """
+        # 药名标准化：中文→英文
+        _drugs_normalized = []
+        for d in drugs:
+            if self.ner is not None:
+                norm = self.ner.normalize_drug(d)
+                en = norm.get('en_name', '') if norm else ''
+                _drugs_normalized.append(en if en else d)
+            else:
+                _drugs_normalized.append(d)
+
         result = {
             'drugs': drugs,
-            'input': {
-                'drugs': drugs,
-                'patient': patient_info,
-                'prescriptions': prescriptions
-            },
+            'input': {'drugs': drugs, 'patient': patient_info, 'prescriptions': prescriptions},
             'analysis': {}
         }
-        
-        # 1. DDI冲突检测（GNN增强 + 副作用比较 fallback）
+
+        # 1. DDI冲突检测
         interactions = []
         for i in range(len(drugs)):
             for j in range(i + 1, len(drugs)):
+                dn_i = _drugs_normalized[i]
+                dn_j = _drugs_normalized[j]
                 ddi_info = {
                     'drug1': drugs[i],
                     'drug2': drugs[j],
                 }
 
-                # 副作用数据（GNN 和 fallback 都需要）
-                se_i = set(self.recommender.get_drug_side_effects(drugs[i]))
-                se_j = set(self.recommender.get_drug_side_effects(drugs[j]))
+                # 副作用数据
+                se_i = set(self.recommender.get_drug_side_effects(dn_i))
+                se_j = set(self.recommender.get_drug_side_effects(dn_j))
                 common = se_i & se_j
                 ddi_info['common_se_count'] = len(common)
                 ddi_info['common_effects'] = list(common)[:10]
@@ -301,7 +326,7 @@ class SandboxEngine:
 
                 # GNN 预测（增强层）
                 gnn_severity = 'none'
-                gnn_result = self._gnn_predict_ddi(drugs[i], drugs[j])
+                gnn_result = self._gnn_predict_ddi(dn_i, dn_j)
                 if gnn_result is not None:
                     ddi_info['method'] = 'gnn'
                     ddi_info['gnn_confidence'] = gnn_result['confidence']
@@ -318,8 +343,8 @@ class SandboxEngine:
                 if self.reasoner:
                     try:
                         ddi_record = self.reasoner._lookup_ddi(
-                            self.reasoner.normalize_drug_name(drugs[i]),
-                            self.reasoner.normalize_drug_name(drugs[j])
+                            self.reasoner.normalize_drug_name(dn_i),
+                            self.reasoner.normalize_drug_name(dn_j)
                         )
                         if ddi_record:
                             llm_has_known_ddi = True
@@ -340,8 +365,16 @@ class SandboxEngine:
                     else:
                         ddi_info['severity'] = 'none'
                 if ddi_info.get('severity', 'none') != 'none':
-                    # LLM解释
-                    if self.reasoner:
+                    # 优先用 API Explainer + PubMed 文献溯源
+                    if self.api_explainer:
+                        try:
+                            ddi_info['explanation'] = self.api_explainer.explain_ddi(
+                                drugs[i], drugs[j])
+                            ddi_info['explanation']['source'] = 'FDA/PubMed'
+                        except Exception:
+                            pass
+                    # 回退到 LLM
+                    elif self.reasoner:
                         try:
                             ddi_info['explanation'] = self.reasoner.explain_ddi(drugs[i], drugs[j])
                         except Exception as e:
@@ -360,7 +393,7 @@ class SandboxEngine:
 
         # 2. 风险评分 — 将药物名转换为 CID 后传入 RiskScorer
         drug_cids = []
-        for drug in drugs:
+        for drug in _drugs_normalized:
             cid = self._drug_name_to_cid(drug)
             drug_cids.append(cid)
         risk_result = self.risk_scorer.calculate_combination_risk(
@@ -375,29 +408,79 @@ class SandboxEngine:
         risk_result['final_score'] = round(adjusted, 1)
         risk_result['raw_score'] = round(raw_score, 1)
         result['analysis']['risk'] = risk_result
-        
-        # 3. 替代药推荐 — 找到DDI严重度最高的"祸首"药物
+
+        # 2.5 处方精简（优先于替代推荐）
+        deprescribing_result = None
+        try:
+            from src.decision.recommender.deprescribing import DeprescribingEngine
+            depr_engine = DeprescribingEngine()
+            lab_vals_depr = None
+            if patient_info:
+                labs_dict = patient_info.get('labs', {})
+                if labs_dict: lab_vals_depr = labs_dict
+            deprescribing_result = depr_engine.generate_global_strategy(
+                drugs=_drugs_normalized, interactions=interactions,
+                patient_info=patient_info, lab_values=lab_vals_depr,
+                alternatives=None, _skip_fallback=True)
+        except Exception: pass
+
+        # 3. 替代药推荐（精简不可行时才触发）
         recommendations = []
-        if risk_result.get('final_score', 0) >= 40 and interactions:
-            # 从DDI中找出出现频率最高的"罪魁祸首"
+        should_alt = (
+            risk_result.get('final_score', 0) >= 30 and interactions
+        )
+        if should_alt:
             drug_hit = defaultdict(int)
+            drug_ddi_details = defaultdict(list)
             for ddi in interactions:
                 sev_w = {'high': 3, 'moderate': 2, 'mild': 1}.get(ddi.get('severity','mild'), 0)
                 drug_hit[ddi['drug1']] += sev_w
                 drug_hit[ddi['drug2']] += sev_w
+                drug_ddi_details[ddi['drug1']].append(f"与{ddi['drug2']}存在{ddi.get('severity','')}级DDI")
+                drug_ddi_details[ddi['drug2']].append(f"与{ddi['drug1']}存在{ddi.get('severity','')}级DDI")
             worst_drug = max(drug_hit, key=drug_hit.get) if drug_hit else drugs[0]
+            worst_idx = drugs.index(worst_drug) if worst_drug in drugs else 0
+            worst_en = _drugs_normalized[worst_idx] if worst_idx < len(_drugs_normalized) else worst_drug
+
+            lab_vals = None
+            if patient_info:
+                ld = patient_info.get('labs', {})
+                if ld: lab_vals = {'creatinine': ld.get('creatinine'), 'alt': ld.get('alt'), 'bun': ld.get('bun'), 'inr': ld.get('inr'), 'potassium': ld.get('potassium')}
 
             alts = self.recommender.recommend_alternatives(
-                worst_drug, current_meds=None,
+                worst_en,
+                current_meds=[d for d in drugs if d != worst_drug],
                 patient_conditions=patient_info.get('conditions', []) if patient_info else [],
-                top_k=3
+                top_k=5, lab_values=lab_vals,
+                original_ddi_severity=max((ddi.get('severity','mild') for ddi in interactions if ddi['drug1']==worst_drug or ddi['drug2']==worst_drug), default='moderate')
             )
             if alts:
                 recommendations.append({
-                    'original': worst_drug,
+                    'original': worst_drug, 'original_en': worst_en,
+                    'why_replaced': drug_ddi_details.get(worst_drug, ['触发DDI风险']),
                     'alternatives': alts
-                    })
+                })
         result['analysis']['alternatives'] = recommendations
+        if deprescribing_result:
+            result['analysis']['deprescribing'] = deprescribing_result
+
+        # 5.5 结构化风险权重（从 API 知识库 risk_weights 直接提取，对齐雷达图）
+        clinical_amplifier = {"bleeding": 0, "renal": 0, "hepatic": 0, "cardiac": 0, "neuro": 0}
+        if self.api_explainer:
+            for ddi_int in interactions:
+                key = tuple(sorted([ddi_int.get('drug1','').lower(), ddi_int.get('drug2','').lower()]))
+                kb = self.api_explainer.CLINICAL_KNOWLEDGE.get(key) or \
+                     self.api_explainer.CLINICAL_KNOWLEDGE.get((key[1], key[0]))
+                if kb:
+                    rw = kb.get('risk_weights', {})
+                    # 按 10 倍缩放（risk_weights 是 0-10 量表 → 映射到 0-100）
+                    for dim in clinical_amplifier:
+                        clinical_amplifier[dim] = max(clinical_amplifier[dim], int(rw.get(dim, 0) * 10))
+        result['analysis']['clinical_amplifier'] = clinical_amplifier
+
+        # 6. API Gate 安检（仅记录可用的API状态，不阻塞推演）
+        result['analysis']['api_gate_available'] = self.api_gate is not None
+        result['analysis']['api_explainer_available'] = self.api_explainer is not None
         
         # 4. 续方检查
         if prescriptions:

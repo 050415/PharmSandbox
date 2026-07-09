@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: pharmsandbox
+    env: python
+    buildCommand: pip install -r requirements_render.txt
+    startCommand: python run.py
+    envVars:
+      - key: PHARMSANDBOX_GNN
+        value: "true"
